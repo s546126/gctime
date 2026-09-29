@@ -1,6 +1,6 @@
 name: Deploy to Cloudflare Pages
 
-# 与 deploy-pages.yml 同一份站点内容，另发一份到 Cloudflare Pages（自定义域名在 Cloudflare 后台绑定）。
+# 与 deploy-pages.yml 同一份站点内容，另发一份到 Cloudflare Pages，自定义域名 gc.bracketboss2026.com（在 Cloudflare 后台 Pages → gctime → Custom domains 绑定一次）。
 # 需要仓库 Secrets：CLOUDFLARE_API_TOKEN（权限 Account → Cloudflare Pages → Edit）、CLOUDFLARE_ACCOUNT_ID。
 # 未配置时本 workflow 直接跳过，不会让 main 变红。
 
