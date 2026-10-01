@@ -52,7 +52,14 @@ function Dashboard({ nodes }) {
   useSyncExternalStore(subscribe, getLocale)
   return <>
     {createPortal(<LanguageSelect id="welcome-language-select" />, document.getElementById('welcome-language'))}
-    <a className="skip-link" href="#forecast-workspace">{text('app.skip')}</a>
+    <a className="skip-link" href="#forecast-workspace" onClick={event => {
+      const target = document.getElementById('forecast-workspace')
+      if (target) {
+        event.preventDefault()
+        target.focus()
+        target.scrollIntoView({ block: 'start' })
+      }
+    }}>{text('app.skip')}</a>
     <header className="workspace-header">
       <a className="brand" href="./" aria-label={text('app.brandLabel')}>
         <span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 28 28" fill="none"><path d="M6 18v-8m8 12V6m8 12v-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /><circle cx="14" cy="14" r="3" fill="currentColor" /></svg></span>

@@ -2723,6 +2723,15 @@ function refreshLocale() {
   }
 }
 window.addEventListener('gc:localechange', refreshLocale);
+// 同页打开另一份分享条件也要经过完整校验；语言选择/保存用 replaceState，不触发此事件。
+window.addEventListener('hashchange', function(event) {
+  if (location.hash === '#forecast-workspace') return;
+  function hasConditions(url) {
+    var values = new URLSearchParams(new URL(url).hash.slice(1));
+    return values.has('share') || values.has('lang');
+  }
+  if (hasConditions(event.oldURL) || hasConditions(event.newURL)) location.reload();
+});
 </script>
 </body>
 </html>

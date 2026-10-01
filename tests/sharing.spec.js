@@ -125,6 +125,57 @@ test('shared conditions override the display without overwriting the recipient p
     .toEqual({ profile: savedProfile, view: 'A', pace: 'model' })
 })
 
+test('same-document share navigation applies incoming conditions and language while back restores the saved profile', async ({ page }) => {
+  await seedSavedProfile(page)
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('gc_language')) localStorage.setItem('gc_language', 'ja')
+  })
+  await page.goto('./')
+  await expectReady(page)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
+  await expect(page.locator('#pv-pd')).toHaveText('2026-01-15')
+  const stored = await page.evaluate(key => ({
+    profile: localStorage.getItem(key), view: localStorage.getItem('eb1a_ab_view'),
+    pace: localStorage.getItem('gc_pace_mode'), language: localStorage.getItem('gc_language')
+  }), profileKey)
+
+  // 只改同一页面的 hash，测试用户粘贴第二条分享链接；不得手动 reload 掩盖问题。
+  await page.goto('./#share=1&category=EB-3&country=IN&pd=2024-02-29&view=B&lang=fr')
+  await expect(page.locator('#pv-pd')).toHaveText('2024-02-29')
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
+  await expect(page.locator('#language-select')).toHaveValue('fr')
+  await expect(page.locator('#shared-notice')).toBeVisible()
+  expect(await page.evaluate(() => ({ category: profile.category, country: profile.country, view: abView, pace: paceMode })))
+    .toEqual({ category: 'EB-3', country: 'IN', view: 'B', pace: 'model' })
+  await expect(page.locator('#ab-status .ab-chip').nth(1)).toHaveAttribute('aria-selected', 'true')
+  expect(await page.evaluate(key => ({
+    profile: localStorage.getItem(key), view: localStorage.getItem('eb1a_ab_view'),
+    pace: localStorage.getItem('gc_pace_mode'), language: localStorage.getItem('gc_language')
+  }), profileKey)).toEqual(stored)
+
+  // 键盘跳转只移动焦点，不覆盖分享 hash，也不触发重载丢失预览。
+  const incomingHash = new URL(page.url()).hash
+  await page.evaluate(() => { window.sharingNavigationToken = 'preview-document' })
+  await page.locator('.skip-link').focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#forecast-workspace')).toBeFocused()
+  expect(new URL(page.url()).hash).toBe(incomingHash)
+  expect(await page.evaluate(() => window.sharingNavigationToken)).toBe('preview-document')
+  await expect(page.locator('#pv-pd')).toHaveText('2024-02-29')
+
+  await page.goBack()
+  await expect(page.locator('#pv-pd')).toHaveText('2026-01-15')
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
+  await expect(page.locator('#shared-notice')).toBeHidden()
+  expect(new URL(page.url()).hash).toBe('')
+  expect(await page.evaluate(() => ({ active: profile, view: abView, pace: paceMode })))
+    .toEqual({ active: savedProfile, view: 'A', pace: 'model' })
+  expect(await page.evaluate(key => ({
+    profile: localStorage.getItem(key), view: localStorage.getItem('eb1a_ab_view'),
+    pace: localStorage.getItem('gc_pace_mode'), language: localStorage.getItem('gc_language')
+  }), profileKey)).toEqual(stored)
+})
+
 test('explicitly saving edited shared conditions removes the snapshot and survives reload', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await seedSavedProfile(page)
@@ -211,10 +262,12 @@ test('a copied snapshot restores all model parameters and the active view, pace,
   expect(fragment.get('pace')).toBe('recent')
   expect(fragment.get('percentile')).toBe('p90')
   expect(fragment.get('supply')).toBe('tight')
-  // 片段变更本身不是一次新文档加载；模拟收件人打开链接后重载初始化。
+  // 应用在分享 hash 变化后自动重载；等待旧文档标记消失，避免旧界面造成误通过。
+  await page.evaluate(() => { window.sharingNavigationToken = 'snapshot-document' })
   await page.goto(url)
-  await page.reload()
+  await page.waitForFunction(() => window.sharingNavigationToken === undefined)
   await expectReady(page)
+  await expect(page.locator('#shared-notice')).toBeVisible()
   expect(await page.evaluate(() => ({
     params: { ...currentParams }, view: abView, pace: paceMode, percentile: selectedPercentile,
     supply: supplyScenario, model: activeModel().key, chartType: profile.chartType
