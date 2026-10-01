@@ -73,10 +73,13 @@
         PD <span id="pv-pd">--</span>
         <span class="dist" id="pv-distance"></span>
       </div>
-      <button class="icon-btn" id="share-btn" title="分享" aria-label="分享"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
-      <button class="icon-btn" id="profile-toggle" title="编辑优先日" aria-label="编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-      <button class="icon-btn" id="refresh-btn" title="刷新到最新（拉取最新签证公告与设置）" aria-label="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+      <button class="icon-btn labeled-action" id="share-btn" title="复制含类别、出生国、优先日及当前参数的链接" aria-label="分享链接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>分享链接</span></button>
+      <button class="icon-btn labeled-action" id="profile-toggle" title="修改类别、出生国和优先日" aria-label="修改条件" aria-controls="profile-edit" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>修改条件</span></button>
+      <button class="icon-btn labeled-action" id="refresh-btn" title="重新加载已发布页面；不主动抓取官方公告。保留档案，未保存的高级参数将重置。" aria-label="重新加载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>重新加载</span></button>
     </div>
+    <p id="action-status" class="action-status" role="status" hidden></p>
+    <input id="share-url" class="share-url" aria-label="手动复制分享链接" readonly hidden>
+    <p id="shared-notice" class="action-status" role="status" hidden></p>
   </div>
 
   <div id="profile-edit" class="profile-edit">
@@ -152,12 +155,12 @@
       <div id="chart-tooltip" class="chart-tooltip"></div>
     </div>
     <div class="legend" id="chart-legend">
-      <span class="leg"><i style="background:#F59E0B"></i>表A裁定</span>
-      <span class="leg"><i class="dash" style="border-color:#64748B"></i>表B递交</span>
-      <span class="leg"><i style="background:#15734F"></i>预测</span>
-      <span class="leg"><i class="band" style="background:#15734F"></i>范围</span>
-      <span class="leg"><i style="background:#15734F;opacity:.3"></i>模拟轨迹</span>
-      <span class="leg"><i class="dash" style="border-color:#F59E0B"></i>你的号</span>
+      <span class="leg"><i style="background:var(--blue)"></i>表A裁定历史</span>
+      <span class="leg"><i style="background:var(--orange)"></i>表B递交历史</span>
+      <span class="leg"><i class="dash" style="border-color:var(--blue)"></i>表A预测中位</span>
+      <span class="leg"><i class="band" style="background:var(--blue)"></i>预测范围</span>
+      <span class="leg"><i style="background:var(--blue);opacity:.3"></i>模拟轨迹</span>
+      <span class="leg"><i class="dash" style="border-color:var(--text3);border-top-style:dotted"></i>你的PD</span>
     </div>
     <div class="touch-hint">移动指针或按住图表滑动，查看各时间点的数值</div>
   </div>
@@ -238,6 +241,7 @@ function loadProfile() {
   return null;
 }
 function persistProfile() {
+  if (typeof sharedState !== 'undefined' && sharedState) return;
   try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch(e) {}
 }
 var savedProfile = loadProfile();
@@ -269,6 +273,18 @@ function countryShort(id) { var c = countryInfo(id); return c.id === 'ROW' ? '�
 // 旧版保存值一律按白名单校验：合法则沿用(向后兼容 'EB-1A'/'CN')，非法回落默认
 if (!findById(CATEGORIES, profile.category)) profile.category = 'EB-1A';
 if (!findById(COUNTRIES, profile.country)) profile.country = 'CN';
+
+var sharedState = window.GCShare.parse(location.hash, CATEGORIES.map(function(c) { return c.id; }), COUNTRIES.map(function(c) { return c.id; }));
+if (sharedState && sharedState.invalid) {
+  document.getElementById('shared-notice').hidden = false;
+  document.getElementById('shared-notice').textContent = '分享链接的条件无效，已保留你的原档案。';
+  sharedState = null;
+} else if (sharedState) {
+  profile = sharedState.profile;
+  savedProfile = profile;
+  document.getElementById('shared-notice').hidden = false;
+  document.getElementById('shared-notice').textContent = '正在查看分享条件，未覆盖你的档案。点击“更新预测”可保存这些条件。结果随公告和日期更新。';
+}
 
 function getYourPD() { return profile.pd; }
 function getCurrentCutoff() { return getCutoffData(profile.category, profile.country, profile.chartType); }
@@ -748,6 +764,7 @@ function gaussian(mu, sigma) {
 var PACE_KEY = 'gc_pace_mode';
 var paceMode = 'model';
 try { var _pm = localStorage.getItem(PACE_KEY); if (_pm === 'model' || _pm === 'recent') paceMode = _pm; } catch (e) {}
+if (sharedState) paceMode = sharedState.pace;
 function getPDDensity(pdDate, params, wall) {
   // 密度曲线 = 当前 cell 的分段线性「结点」表 [ts, 值]：值为数字，或 'H'(densityHigh) / 'P'(densityPeak) / 'W'(P×需求墙)。
   // 首结点之前取首值、末结点之后取末值。EB-1A 中国的结点复刻了原先硬编码的 5 段曲线(见 DENSITY_EB1CN)。
@@ -1013,6 +1030,7 @@ var chartMode = 'trend';
 var AB_KEY = 'eb1a_ab_view';
 var abView = 'A';
 try { var _sv = localStorage.getItem(AB_KEY); if (_sv === 'A' || _sv === 'B') abView = _sv; } catch (e) {}
+if (sharedState) { abView = sharedState.view; selectedPercentile = sharedState.percentile; }
 var lastSnapData = null;
 
 // Helpers
@@ -1155,11 +1173,37 @@ function animateHero() {
 
 function redrawChart(skipAnimation) {
   if (!lastPercentiles) return;
+  setTrendLegend();
   if (chartMode === 'wait') drawWaitTimeChart(lastPercentiles, skipAnimation);
   else drawForecastChart(lastPercentiles, skipAnimation);
 }
 
 // Chart Utilities
+function chartTableColor(table) { return table === 'B' ? 'var(--orange)' : 'var(--blue)'; }
+function chartTableLabel(table) { return table === 'B' ? '表B递交' : '表A裁定'; }
+
+function chartHistoryMonth(path, timestamp) {
+  var date = new Date(timestamp), month = date.getUTCFullYear() * 12 + date.getUTCMonth();
+  for (var i = 0; i < path.length; i++) {
+    var d = new Date(path[i].x);
+    if (d.getUTCFullYear() * 12 + d.getUTCMonth() === month) return path[i];
+  }
+  return null;
+}
+
+// 等待图的各条线拥有不同的 PD 横坐标，只在同一 PD 插值读数，不跨范围外推。
+function chartValueAtX(path, x) {
+  if (!path || !path.length || x < path[0].x || x > path[path.length - 1].x) return null;
+  for (var i = 0; i < path.length; i++) {
+    if (path[i].x === x) return path[i].y;
+    if (path[i].x > x && i > 0) {
+      var a = path[i - 1], b = path[i];
+      return a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x);
+    }
+  }
+  return null;
+}
+
 function chartLayout() {
   var svg = document.getElementById('chart');
   var rect = svg.getBoundingClientRect();
@@ -1310,7 +1354,12 @@ function setupChartTooltip() {
 
   function fmtDate(ts) {
     var d = new Date(ts);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  function tooltipRow(label, value, color, table) {
+    return '<div class="tt-series"' + (table ? ' data-table="' + table + '"' : '') + '><span class="tt-dot" style="background:' + color + '"></span>' +
+      '<span class="tt-sname">' + label + '</span><span class="tt-sval" style="color:' + color + '">' + value + '</span></div>';
   }
 
   function updateHover(e) {
@@ -1320,7 +1369,8 @@ function setupChartTooltip() {
 
     crosshairV = ensure(crosshairV, 'line', { stroke: '#94A3B8', 'stroke-width': '1', 'stroke-dasharray': '2 2' });
     crosshairH = ensure(crosshairH, 'line', { stroke: '#94A3B8', 'stroke-width': '1', 'stroke-dasharray': '2 2' });
-    hoverDot = ensure(hoverDot, 'circle', { r: '5', fill: '#15734F', stroke: '#fff', 'stroke-width': '2' });
+    hoverDot = ensure(hoverDot, 'circle', { r: '5', stroke: '#fff', 'stroke-width': '2' });
+    hoverDot.setAttribute('fill', chartTableColor(abView));
 
     crosshairV.setAttribute('x1', c.svgX); crosshairV.setAttribute('x2', c.svgX);
     crosshairV.setAttribute('y1', b.PAD.top); crosshairV.setAttribute('y2', b.PAD.top + b.PH);
@@ -1343,16 +1393,26 @@ function setupChartTooltip() {
         if (!hoverDot.parentNode) svg.appendChild(hoverDot);
         showDot = true;
 
-        if (chartMode === 'wait') {
-          html = '<div class="tt-hdr">PD: ' + fmtDate(snap.x) + '</div>';
-          if (p10v !== null) html += '<div class="tt-series"><span class="tt-dot" style="background:#10B981"></span><span class="tt-sname">快</span><span class="tt-sval" style="color:#10B981">' + p10v.toFixed(1) + '年</span></div>';
-          html += '<div class="tt-series"><span class="tt-dot" style="background:#15734F"></span><span class="tt-sname">中</span><span class="tt-sval" style="color:#15734F">' + snap.y.toFixed(1) + '年</span></div>';
-          if (p90v !== null) html += '<div class="tt-series"><span class="tt-dot" style="background:#EF4444"></span><span class="tt-sname">慢</span><span class="tt-sval" style="color:#EF4444">' + p90v.toFixed(1) + '年</span></div>';
+        var color = chartTableColor(abView), label = chartTableLabel(abView);
+        if (predIdx < 0 && chartMode === 'trend') {
+          html = '<div class="tt-hdr">' + fmtDate(snap.x) + ' · 历史公告</div>';
+          ['A', 'B'].forEach(function(table) {
+            var point = chartHistoryMonth(table === 'A' ? histA() : histB(), snap.x);
+            html += tooltipRow(chartTableLabel(table), point ? fmtDate(point.y) : '本月无数据', chartTableColor(table), table);
+          });
+        } else if (predIdx < 0) {
+          html = '<div class="tt-hdr">PD: ' + fmtDate(snap.x) + ' · ' + label + '</div>';
+          html += tooltipRow('历史等待', snap.y.toFixed(1) + '年', color, abView);
+          html += '<div class="tt-label">仅显示当前表的历史等待</div>';
         } else {
-          html = '<div class="tt-hdr">' + fmtDate(snap.x) + '</div>';
-          if (p10v !== null) html += '<div class="tt-series"><span class="tt-dot" style="background:#10B981"></span><span class="tt-sname">快</span><span class="tt-sval" style="color:#10B981">' + fmtDate(p10v) + '</span></div>';
-          html += '<div class="tt-series"><span class="tt-dot" style="background:#15734F"></span><span class="tt-sname">中</span><span class="tt-sval" style="color:#15734F">' + fmtDate(snap.y) + '</span></div>';
-          if (p90v !== null) html += '<div class="tt-series"><span class="tt-dot" style="background:#EF4444"></span><span class="tt-sname">慢</span><span class="tt-sval" style="color:#EF4444">' + fmtDate(p90v) + '</span></div>';
+          var waitMode = chartMode === 'wait';
+          if (waitMode) { p10v = chartValueAtX(lastSnapData.p10, snap.x); p90v = chartValueAtX(lastSnapData.p90, snap.x); }
+          html = '<div class="tt-hdr">' + (waitMode ? 'PD: ' : '') + fmtDate(snap.x) + ' · ' + label + (waitMode ? '等待预测' : '预测') + '</div>';
+          function valueText(value) { return value === null ? '超出预测范围' : (waitMode ? value.toFixed(1) + '年' : fmtDate(value)); }
+          html += tooltipRow('乐观', valueText(p10v), color);
+          html += tooltipRow('中位', valueText(snap.y), color);
+          html += tooltipRow('保守', valueText(p90v), color);
+          html += '<div class="tt-label">另一表请切换查看</div>';
         }
       }
     }
@@ -1422,6 +1482,7 @@ function drawForecastChart(percentiles, skipAnimation) {
   var W = layout.W, H = layout.H, PAD = layout.PAD;
   var PW = W - PAD.left - PAD.right, PH = H - PAD.top - PAD.bottom;
   var yourPD = getYourPD();
+  var seriesColor = chartTableColor(abView), otherTable = abView === 'A' ? 'B' : 'A';
 
   // 表B(DFF)视图：表B 无独立配额驱动，诚实做法 = 表A 预测整体前移一个"领先量"
   // lead(=当前表B − 当前表A)，形状跟随表A基本面，标注不确定性高于表A。abView='A' 保持原状。
@@ -1483,8 +1544,8 @@ function drawForecastChart(percentiles, skipAnimation) {
   // Defs: clip + gradients
   var defs = '<defs>' +
     '<clipPath id="plot-clip"><rect x="' + PAD.left + '" y="' + PAD.top + '" width="' + PW + '" height="' + PH + '"/></clipPath>' +
-    '<linearGradient id="band-outer" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#15734F" stop-opacity="0.10"/><stop offset="100%" stop-color="#15734F" stop-opacity="0.02"/></linearGradient>' +
-    '<linearGradient id="band-inner" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#15734F" stop-opacity="0.18"/><stop offset="100%" stop-color="#15734F" stop-opacity="0.05"/></linearGradient>' +
+    '<linearGradient id="band-outer" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + seriesColor + '" stop-opacity="0.10"/><stop offset="100%" stop-color="' + seriesColor + '" stop-opacity="0.02"/></linearGradient>' +
+    '<linearGradient id="band-inner" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + seriesColor + '" stop-opacity="0.18"/><stop offset="100%" stop-color="' + seriesColor + '" stop-opacity="0.05"/></linearGradient>' +
     '</defs>';
   var bg = '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:var(--card)"/>';
 
@@ -1511,37 +1572,36 @@ function drawForecastChart(percentiles, skipAnimation) {
   // PD line
   var pdY = sy(yourPD);
   var pdDateStr = formatDate(yourPD);
-  var pdLine = '<line x1="' + PAD.left + '" y1="' + pdY + '" x2="' + (PAD.left + PW) + '" y2="' + pdY + '" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.8"/>';
-  var pdLabel = '<text x="' + (PAD.left + PW - 4) + '" y="' + (pdY - 5) + '" fill="#F59E0B" font-size="11" text-anchor="end" font-weight="600">你的号 ' + pdDateStr + '</text>';
+  var pdLine = '<line data-series="pd" x1="' + PAD.left + '" y1="' + pdY + '" x2="' + (PAD.left + PW) + '" y2="' + pdY + '" stroke="var(--text3)" stroke-width="1.5" stroke-dasharray="2 4" opacity="0.8"/>';
+  var pdLabel = '<text x="' + (PAD.left + PW - 4) + '" y="' + (pdY - 5) + '" fill="var(--text3)" font-size="11" text-anchor="end" font-weight="600">你的号 ' + pdDateStr + '</text>';
 
   // Today
   var todayX = sx(TODAY);
   var todayLine = '<line x1="' + todayX + '" y1="' + PAD.top + '" x2="' + todayX + '" y2="' + (PAD.top + PH) + '" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="3 3"/>';
   var todayLabel = '<text x="' + todayX + '" y="' + (PAD.top - 5) + '" fill="#94A3B8" font-size="11" text-anchor="middle">今天</text>';
 
-  // History：主视图(primHist)橙实线+点；另一张表(secHist)降为次要灰虚线
+  // A/B 保持各自颜色，历史均为实线；当前选中表稍加粗。
   var histVisible = primHist.filter(function(h) { return h.x >= xMin - 90 * MS_PER_DAY; });
-  var hist = '<path d="' + linePathD(histVisible, sx, sy) + '" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  var hist = '<path data-series="history-' + abView + '" d="' + linePathD(histVisible, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
   for (var h = 0; h < histVisible.length; h++) {
     if (histVisible[h].x < xMin || histVisible[h].y < yMin) continue;
-    hist += '<circle cx="' + sx(histVisible[h].x).toFixed(1) + '" cy="' + sy(histVisible[h].y).toFixed(1) + '" r="2.5" fill="#F59E0B"/>';
+    hist += '<circle cx="' + sx(histVisible[h].x).toFixed(1) + '" cy="' + sy(histVisible[h].y).toFixed(1) + '" r="2.5" fill="' + seriesColor + '"/>';
   }
   var histBVisible = secHist.filter(function(h) { return h.x >= xMin - 90 * MS_PER_DAY; });
-  var histBPath = histBVisible.length ? '<path d="' + linePathD(histBVisible, sx, sy) + '" fill="none" stroke="#64748B" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.75" stroke-linecap="round" stroke-linejoin="round"/>' : '';
+  var histBPath = histBVisible.length ? '<path data-series="history-' + otherTable + '" d="' + linePathD(histBVisible, sx, sy) + '" fill="none" stroke="' + chartTableColor(otherTable) + '" stroke-width="1.5" opacity="0.75" stroke-linecap="round" stroke-linejoin="round"/>' : '';
 
   // Prediction lines (smooth)
-  var lineP90 = '<path d="' + smoothPathD(percentiles.p90, sx, sy) + '" fill="none" stroke="#EF4444" stroke-width="1" stroke-dasharray="4 3" opacity="0.5" stroke-linecap="round"/>';
-  var lineP10 = '<path d="' + smoothPathD(percentiles.p10, sx, sy) + '" fill="none" stroke="#10B981" stroke-width="1" stroke-dasharray="4 3" opacity="0.5" stroke-linecap="round"/>';
-  var lineP50 = '<path d="' + smoothPathD(percentiles.p50, sx, sy) + '" fill="none" stroke="#15734F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  var lineP90 = '<path data-series="forecast-p90" d="' + smoothPathD(percentiles.p90, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" stroke-linecap="round"/>';
+  var lineP10 = '<path data-series="forecast-p10" d="' + smoothPathD(percentiles.p10, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" stroke-linecap="round"/>';
+  var lineP50 = '<path data-series="forecast-p50" d="' + smoothPathD(percentiles.p50, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="2.5" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round"/>';
 
   // Cross marker with glow
   // 穿越标记：与 hero/快中慢/等待图统一用 activeCrossings(穿越时间分布)，避免大数字与图上绿点口径不一致
   var crossMarker = '';
-  var selColors = { p10: '#10B981', p25: '#5cbf99', p50: '#15734F', p75: '#F59E0B', p90: '#EF4444' };
   var _acX = activeCrossings();
   var crossX = _acX ? _acX[selectedPercentile] : null;
   if (crossX) {
-    var cx = sx(crossX), color = selColors[selectedPercentile];
+    var cx = sx(crossX), color = seriesColor;
     if (cx >= PAD.left && cx <= PAD.left + PW) {
       crossMarker += '<circle cx="' + cx.toFixed(1) + '" cy="' + pdY + '" r="10" fill="' + color + '" opacity="0.12"/>';
       crossMarker += '<circle class="cross-dot" cx="' + cx.toFixed(1) + '" cy="' + pdY + '" r="5" fill="' + color + '" stroke="#fff" stroke-width="2"/>';
@@ -1559,7 +1619,7 @@ function drawForecastChart(percentiles, skipAnimation) {
   if (lastCloudPaths && lastCloudPaths.length) {
     for (var ci = 0; ci < lastCloudPaths.length; ci++) {
       var cd = linePathD(viewPath(lastCloudPaths[ci]), sx, sy);
-      if (cd) cloud += '<path class="mc-line" d="' + cd + '" fill="none" stroke="#15734F" stroke-width="0.6" opacity="0.13" stroke-linejoin="round"/>';
+      if (cd) cloud += '<path class="mc-line" d="' + cd + '" fill="none" stroke="' + seriesColor + '" stroke-width="0.6" opacity="0.13" stroke-linejoin="round"/>';
     }
   }
   var revDefs = '<clipPath id="reveal-clip"><rect id="reveal-rect" x="' + revX + '" y="' + PAD.top + '" width="' + (fcRight - revX) + '" height="' + PH + '"/></clipPath>' +
@@ -1581,6 +1641,7 @@ function drawWaitTimeChart(percentiles, skipAnimation) {
   var W = layout.W, H = layout.H, PAD = layout.PAD;
   var PW = W - PAD.left - PAD.right, PH = H - PAD.top - PAD.bottom;
   var yourPD = getYourPD();
+  var seriesColor = chartTableColor(abView);
   // 表B 视图：历史取 histB()、预测路径经 projectB 推演，与走势图同口径
   var HV = abView === 'B' ? histB() : histA();
   var _pv = {};
@@ -1640,8 +1701,8 @@ function drawWaitTimeChart(percentiles, skipAnimation) {
   // Defs
   var defs = '<defs>' +
     '<clipPath id="plot-clip"><rect x="' + PAD.left + '" y="' + PAD.top + '" width="' + PW + '" height="' + PH + '"/></clipPath>' +
-    '<linearGradient id="band-outer" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#15734F" stop-opacity="0.10"/><stop offset="100%" stop-color="#15734F" stop-opacity="0.02"/></linearGradient>' +
-    '<linearGradient id="band-inner" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#15734F" stop-opacity="0.18"/><stop offset="100%" stop-color="#15734F" stop-opacity="0.05"/></linearGradient>' +
+    '<linearGradient id="band-outer" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + seriesColor + '" stop-opacity="0.10"/><stop offset="100%" stop-color="' + seriesColor + '" stop-opacity="0.02"/></linearGradient>' +
+    '<linearGradient id="band-inner" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + seriesColor + '" stop-opacity="0.18"/><stop offset="100%" stop-color="' + seriesColor + '" stop-opacity="0.05"/></linearGradient>' +
     '</defs>';
   var bg = '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:var(--card)"/>';
 
@@ -1669,20 +1730,20 @@ function drawWaitTimeChart(percentiles, skipAnimation) {
 
   // PD line
   var pdX = sx(yourPD);
-  var pdLine = '<line x1="' + pdX + '" y1="' + PAD.top + '" x2="' + pdX + '" y2="' + (PAD.top + PH) + '" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.8"/>';
-  var pdLabel = '<text x="' + (pdX + 4) + '" y="' + (PAD.top + 12) + '" fill="#F59E0B" font-size="11" font-weight="600">你的PD</text>';
+  var pdLine = '<line data-series="pd" x1="' + pdX + '" y1="' + PAD.top + '" x2="' + pdX + '" y2="' + (PAD.top + PH) + '" stroke="var(--text3)" stroke-width="1.5" stroke-dasharray="2 4" opacity="0.8"/>';
+  var pdLabel = '<text x="' + (pdX + 4) + '" y="' + (PAD.top + 12) + '" fill="var(--text3)" font-size="11" font-weight="600">你的PD</text>';
 
   // History (smooth)
-  var hist = '<path d="' + linePathD(histWait, sx, sy) + '" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  var hist = '<path data-series="history-' + abView + '" d="' + linePathD(histWait, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
   for (var h = 0; h < histWait.length; h++) {
     if (histWait[h].x < xMin || histWait[h].x > xMax) continue;
-    hist += '<circle cx="' + sx(histWait[h].x).toFixed(1) + '" cy="' + sy(histWait[h].y).toFixed(1) + '" r="2.5" fill="#F59E0B"/>';
+    hist += '<circle cx="' + sx(histWait[h].x).toFixed(1) + '" cy="' + sy(histWait[h].y).toFixed(1) + '" r="2.5" fill="' + seriesColor + '"/>';
   }
 
   // Prediction (smooth)
-  var lineP90 = waitP90.length ? '<path d="' + linePathD(waitP90, sx, sy) + '" fill="none" stroke="#EF4444" stroke-width="1" stroke-dasharray="4 3" opacity="0.5" stroke-linecap="round"/>' : '';
-  var lineP10 = waitP10.length ? '<path d="' + linePathD(waitP10, sx, sy) + '" fill="none" stroke="#10B981" stroke-width="1" stroke-dasharray="4 3" opacity="0.5" stroke-linecap="round"/>' : '';
-  var lineP50 = waitP50.length ? '<path d="' + linePathD(waitP50, sx, sy) + '" fill="none" stroke="#15734F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '';
+  var lineP90 = waitP90.length ? '<path data-series="forecast-p90" d="' + linePathD(waitP90, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" stroke-linecap="round"/>' : '';
+  var lineP10 = waitP10.length ? '<path data-series="forecast-p10" d="' + linePathD(waitP10, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.45" stroke-linecap="round"/>' : '';
+  var lineP50 = waitP50.length ? '<path data-series="forecast-p50" d="' + linePathD(waitP50, sx, sy) + '" fill="none" stroke="' + seriesColor + '" stroke-width="2.5" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round"/>' : '';
 
   // Cross marker with glow
   var crossMarker = '';
@@ -1692,8 +1753,7 @@ function drawWaitTimeChart(percentiles, skipAnimation) {
     if (selCross) {
       var selWait = (selCross - yourPD) / (365.25 * MS_PER_DAY);
       if (selWait >= 0 && selWait < 20) {
-        var selColors = { p10: '#10B981', p25: '#5cbf99', p50: '#15734F', p75: '#F59E0B', p90: '#EF4444' };
-        var color = selColors[selectedPercentile];
+        var color = seriesColor;
         crossMarker += '<circle cx="' + pdX.toFixed(1) + '" cy="' + sy(selWait).toFixed(1) + '" r="10" fill="' + color + '" opacity="0.12"/>';
         crossMarker += '<circle class="cross-dot" cx="' + pdX.toFixed(1) + '" cy="' + sy(selWait).toFixed(1) + '" r="5" fill="' + color + '" stroke="#fff" stroke-width="2"/>';
         crossMarker += '<text x="' + pdX + '" y="' + (sy(selWait) - 14) + '" fill="' + color + '" font-size="12" text-anchor="middle" font-weight="700">' + selWait.toFixed(1) + '年</text>';
@@ -1715,7 +1775,7 @@ function drawWaitTimeChart(percentiles, skipAnimation) {
   if (lastCloudPaths && lastCloudPaths.length) {
     for (var ci = 0; ci < lastCloudPaths.length; ci++) {
       var cd = linePathD(pathToWait(viewPath(lastCloudPaths[ci])), sx, sy);
-      if (cd) cloud += '<path class="mc-line" d="' + cd + '" fill="none" stroke="#15734F" stroke-width="0.6" opacity="0.13" stroke-linejoin="round"/>';
+      if (cd) cloud += '<path class="mc-line" d="' + cd + '" fill="none" stroke="' + seriesColor + '" stroke-width="0.6" opacity="0.13" stroke-linejoin="round"/>';
     }
   }
   var revDefs = '<clipPath id="reveal-clip"><rect id="reveal-rect" x="' + revX + '" y="' + PAD.top + '" width="' + (fcRight - revX) + '" height="' + PH + '"/></clipPath>' +
@@ -1742,12 +1802,6 @@ window.setChartMode = function(mode) {
   chartMode = mode;
   document.getElementById('mode-trend').classList.toggle('active', mode === 'trend');
   document.getElementById('mode-wait').classList.toggle('active', mode === 'wait');
-  var legend = document.getElementById('chart-legend');
-  if (mode === 'wait') {
-    legend.innerHTML = '<span class="leg"><i style="background:#F59E0B"></i>历史等待</span><span class="leg"><i style="background:#15734F"></i>预测等待</span><span class="leg"><i class="band" style="background:#15734F"></i>范围</span><span class="leg"><i style="background:#15734F;opacity:.3"></i>模拟轨迹</span><span class="leg"><i class="dash" style="border-color:#F59E0B"></i>你的PD</span>';
-  } else {
-    setTrendLegend();
-  }
   redrawChart();
 };
 
@@ -1837,7 +1891,7 @@ function renderHero() {
 window.setAbView = function(v) {
   if (abView === v || (v !== 'A' && v !== 'B')) return;
   abView = v;
-  try { localStorage.setItem(AB_KEY, v); } catch (e) {}   // 记住选择，下次访问沿用
+  try { if (!sharedState) localStorage.setItem(AB_KEY, v); } catch (e) {}   // 分享预览不覆盖本机偏好
   renderHero();                               // 大数字/快中慢/标签切表A裁定↔表B递交
   renderStats();
   renderMonthlyTable(lastPercentiles);
@@ -1846,14 +1900,19 @@ window.setAbView = function(v) {
 
 function setTrendLegend() {
   var legend = document.getElementById('chart-legend');
-  if (!legend || chartMode !== 'trend') return;
-  var primLbl = abView === 'B' ? '表B递交' : '表A裁定';
-  var secLbl = abView === 'B' ? '表A裁定' : '表B递交';
-  legend.innerHTML = '<span class="leg"><i style="background:#F59E0B"></i>' + primLbl + '</span>' +
-    '<span class="leg"><i class="dash" style="border-color:#64748B"></i>' + secLbl + '</span>' +
-    '<span class="leg"><i style="background:#15734F"></i>预测</span>' +
-    '<span class="leg"><i class="band" style="background:#15734F"></i>范围</span>' +
-    '<span class="leg"><i class="dash" style="border-color:#F59E0B"></i>你的号</span>';
+  if (!legend) return;
+  var color = chartTableColor(abView), waitMode = chartMode === 'wait';
+  var tables = waitMode ? [abView] : ['A', 'B'];
+  var html = tables.map(function(table) {
+    return '<span class="leg" data-series="history-' + table + '"><i style="background:' + chartTableColor(table) + '"></i>' + chartTableLabel(table) + (waitMode ? '历史等待' : '历史') + '</span>';
+  }).join('');
+  legend.innerHTML = html +
+    '<span class="leg" data-series="forecast-p50"><i class="dash" style="border-color:' + color + '"></i>表' + abView + (waitMode ? '等待预测中位' : '预测中位') + '</span>' +
+    '<span class="leg"><i class="band" style="background:' + color + '"></i>预测范围</span>' +
+    '<span class="leg"><i style="background:' + color + ';opacity:.3"></i>模拟轨迹</span>' +
+    '<span class="leg" data-series="pd"><i class="dash" style="border-color:var(--text3);border-top-style:dotted"></i>你的PD</span>';
+  var description = document.getElementById('chart-description');
+  if (description) description.textContent = chartTableLabel(abView) + (waitMode ? '等待' : '') + '：实线历史，虚线预测';
 }
 
 // 年度总供给聚合显示：把"固定基底 2,803 小、大头是浮动溢出"这个现实结构显性化
@@ -2441,33 +2500,44 @@ function renderBulletinPanel() {
   var btn = document.getElementById('share-btn');
   if (!btn) return;
   btn.addEventListener('click', function () {
-    var SHARE_TEXT = catInfo().short + ' ' + countryInfo().label + '申请人绿卡排期预测：输入优先日，即可使用蒙特卡洛模拟来估算大约何时排到（支持 EB-1 ~ EB-5）。自动同步每月最新签证公告。https://djzoom.github.io/EB1A/';
-    function done() { var o = btn.textContent; btn.textContent = '已复制 ✓'; setTimeout(function () { btn.textContent = o; }, 1500); }
+    var status = document.getElementById('action-status');
+    var input = document.getElementById('share-url');
+    var url = window.GCShare.build(location.href, {
+      category: profile.category, country: profile.country, pd: formatDateDay(profile.pd),
+      view: abView, pace: paceMode, percentile: selectedPercentile, supply: supplyScenario,
+      params: currentParams, lang: document.documentElement.lang
+    });
+    input.hidden = true;
+    status.hidden = false;
+    function done() { status.textContent = '链接已复制，包含当前类别、出生国、优先日及参数。'; }
     function fallback() {
-      var ta = document.createElement('textarea');
-      ta.value = SHARE_TEXT; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); done(); } catch (e) { prompt('复制以下内容分享：', SHARE_TEXT); }
-      document.body.removeChild(ta);
+      input.value = url; input.hidden = false; input.focus(); input.select();
+      try { if (document.execCommand('copy')) { input.hidden = true; btn.focus(); done(); return; } } catch (e) {}
+      status.textContent = '无法自动复制，请手动复制下方链接。';
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(SHARE_TEXT).then(done, fallback);
+      navigator.clipboard.writeText(url).then(done, fallback);
     } else { fallback(); }
   });
 })();
 
 setupDateGroup('pe-pd');
+function syncProfileButton() {
+  var visible = matchMedia('(min-width: 768px)').matches || document.getElementById('profile-edit').classList.contains('active');
+  document.getElementById('profile-toggle').setAttribute('aria-expanded', String(visible));
+}
 document.getElementById('profile-toggle').addEventListener('click', function() {
   var edit = document.getElementById('profile-edit');
   var btn = document.getElementById('profile-toggle');
-  // 不再隐藏 profile-view：编辑表单是下方独立块，隐藏顶栏 PD 会让按钮左移跳动
-  if (edit.classList.contains('active')) {
-    edit.classList.remove('active'); btn.classList.remove('editing'); btn.title = '编辑优先日';
+  var desktop = matchMedia('(min-width: 768px)').matches;
+  if (!desktop && edit.classList.contains('active')) {
+    edit.classList.remove('active'); btn.classList.remove('editing');
   } else {
-    writeDateGroup('pe-pd', profile.pd);
-    syncSelectors();
-    edit.classList.add('active'); btn.classList.add('editing'); btn.title = '收起';
+    if (!desktop) { writeDateGroup('pe-pd', profile.pd); syncSelectors(); }
+    edit.classList.add('active'); btn.classList.add('editing');
+    document.getElementById('pe-cat').focus();
   }
+  syncProfileButton();
 });
 document.getElementById('pe-save').addEventListener('click', function() {
   var pd = readDateGroup('pe-pd');
@@ -2475,10 +2545,21 @@ document.getElementById('pe-save').addEventListener('click', function() {
   if (!pd) { if (errEl) errEl.hidden = false; if (grp) grp.classList.add('invalid'); return; }
   if (errEl) errEl.hidden = true;
   if (grp) grp.classList.remove('invalid');
+  // 只有明确保存才将分享条件写入接收者档案，并移除一次性分享片段。
+  if (sharedState) {
+    sharedState = null;
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+      localStorage.setItem(AB_KEY, abView);
+      localStorage.setItem(PACE_KEY, paceMode);
+    } catch (e) {}
+    document.getElementById('shared-notice').hidden = true;
+  }
   profile.pd = pd;
   persistProfile();
   document.getElementById('profile-edit').classList.remove('active');
-  var pt = document.getElementById('profile-toggle'); pt.classList.remove('editing'); pt.title = '编辑优先日';
+  var pt = document.getElementById('profile-toggle'); pt.classList.remove('editing');
+  syncProfileButton();
   var nc = document.getElementById('pe-cat').value, nco = document.getElementById('pe-co').value;
   if (nc !== profile.category || nco !== profile.country) applyCell(nc, nco);   // 换了类别/国家：换模型并重画
   else render();
@@ -2487,8 +2568,11 @@ document.getElementById('pe-cancel').addEventListener('click', function() {
   writeDateGroup('pe-pd', profile.pd);
   syncSelectors();
   document.getElementById('profile-edit').classList.remove('active');
-  var pt = document.getElementById('profile-toggle'); pt.classList.remove('editing'); pt.title = '编辑优先日';
+  var pt = document.getElementById('profile-toggle'); pt.classList.remove('editing');
+  syncProfileButton();
 });
+syncProfileButton();
+window.addEventListener('resize', syncProfileButton);
 
 document.querySelectorAll('.stat').forEach(function(cell) {
   cell.addEventListener('click', function() {
@@ -2512,7 +2596,7 @@ function syncPaceUI() {
 window.setPaceMode = function(m) {
   if (m !== 'model' && m !== 'recent') return;
   paceMode = m;
-  try { localStorage.setItem(PACE_KEY, m); } catch (e) {}
+  try { if (!sharedState) localStorage.setItem(PACE_KEY, m); } catch (e) {}
   window._panelPct = null;
   syncPaceUI();
   if (profile.pd) render();
@@ -2524,15 +2608,9 @@ syncPaceUI();
 
 document.getElementById('replay-btn').addEventListener('click', replayDeduction);
 document.getElementById('refresh-btn').addEventListener('click', function () {
-  var b = this; b.disabled = true; b.textContent = '刷新中…';
-  var reload = function () { location.reload(); };
-  try {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.update(); } catch (e) {} }); });
-    // 在线时清掉缓存以确保拉到最新签证公告/设置；离线则直接重载(由 SW 回退缓存)
-    if (navigator.onLine !== false && window.caches && caches.keys) {
-      caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }).then(reload).catch(reload);
-    } else { reload(); }
-  } catch (e) { reload(); }
+  this.disabled = true;
+  // 仅重载当前已发布页面；不删除同源缓存，也不声称触发官方公告抓取。
+  location.reload();
 });
 document.getElementById('mode-trend').addEventListener('click', function() { setChartMode('trend'); });
 document.getElementById('mode-wait').addEventListener('click', function() { setChartMode('wait'); });
@@ -2584,6 +2662,24 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 })();
 
 activateModel();
+if (sharedState) {
+  var sharedParams = sharedState.params;
+  var extraBounds = { demandWallSigma: [0, 2], supplyTailProb: [0, 1], supplyTailMag: [1, 5] };
+  var validParams = sharedParams && Object.keys(sharedParams).every(function(key) {
+    var meta = PARAM_META[key];
+    var bounds = meta ? [meta.min, meta.max] : extraBounds[key];
+    return bounds && typeof sharedParams[key] === 'number' && Number.isFinite(sharedParams[key]) &&
+      sharedParams[key] >= bounds[0] && sharedParams[key] <= bounds[1];
+  });
+  if (validParams) {
+    Object.keys(sharedParams).forEach(function(key) { currentParams[key] = sharedParams[key]; });
+    supplyScenario = sharedState.scenario;
+  } else if (sharedParams) {
+    document.getElementById('shared-notice').textContent = '分享参数无效，已使用该类别的默认参数；你的原档案未被覆盖。';
+  }
+  document.querySelectorAll('.sc-btn').forEach(function(btn) { btn.classList.toggle('active', btn.dataset.sc === supplyScenario); });
+  syncPaceUI();
+}
 syncSelectors();
 writeDateGroup('pe-pd', profile.pd);
 updateTitles();

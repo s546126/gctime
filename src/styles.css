@@ -67,6 +67,11 @@
   .topbar-info .dist { display: block; margin: 1px 0 0; color: var(--text3); font-size: 11px; }
   .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--card); color: var(--text2); }
   #share-btn { background: var(--card); border-color: var(--border); }
+  .labeled-action { width: auto; gap: 7px; padding: 0 10px; font-size: 12px; }
+  .action-status { grid-column: 1 / -1; color: var(--text2); font-size: 12px; margin-top: 6px; }
+  .action-status[hidden], .share-url[hidden] { display: none; }
+  .share-url { grid-column: 1 / -1; width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+  .profile-widget:has(.profile-edit.active) { outline: 2px solid var(--blue-light); outline-offset: 8px; border-radius: 8px; }
   .workspace-grid { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 32px; align-items: start; }
   .profile-rail { position: sticky; top: 24px; min-width: 0; }
   .forecast-workspace { display: grid; gap: 32px; min-width: 0; }
@@ -218,6 +223,9 @@
     .topbar { display: flex; gap: 5px; }
     .topbar h1 { font-size: 24px; }
     .topbar-row { margin-top: 12px; width: 100%; }
+    .topbar-row { flex-wrap: wrap; }
+    .topbar-row .topbar-info { flex-basis: 100%; }
+    .labeled-action { flex: 1; padding: 0 8px; gap: 5px; white-space: nowrap; }
     .topbar-info { margin-right: auto; flex: 1; }
     .page-heading { margin-bottom: 20px; }
     .workspace-grid { grid-template-columns: 1fr; gap: 20px; }

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { Widget } from '@heroui-pro/react/widget'
 import { Button } from '@heroui/react/button'
+import './share.js'
 
 // React 只管理外壳。预测引擎独占插槽内的原有 DOM，不复制表单、不重写模型。
 function LegacySlot({ node, className = '' }) {
@@ -62,7 +63,7 @@ function Dashboard({ nodes }) {
             <Widget.Content><LegacySlot node={nodes.result} /></Widget.Content>
           </Widget>
           <Widget className="chart-widget">
-            <Widget.Header><div><Widget.Title>排期走势</Widget.Title><Widget.Description>历史走到哪里，未来可能怎样</Widget.Description></div><span className="model-label">500 次模拟</span></Widget.Header>
+            <Widget.Header><div><Widget.Title>排期走势</Widget.Title><Widget.Description id="chart-description">历史走到哪里，未来可能怎样</Widget.Description></div><span className="model-label">500 次模拟</span></Widget.Header>
             <Widget.Content><LegacySlot node={nodes.chart} /></Widget.Content>
           </Widget>
           </div>
