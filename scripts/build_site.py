@@ -19,12 +19,13 @@ ASSETS = (
     "vendor/gsap.min.js",
     "assets/ui.js", "assets/ui.css",
 )
+ONLINE_ASSETS = {"src/sponsor.js": "assets/sponsor.js"}
 
 
 def main(skip_ui=False):
     if not skip_ui:
         ensure_ui_assets()
-    missing = [name for name in ASSETS if not (ROOT / name).is_file()]
+    missing = [name for name in (*ASSETS, *ONLINE_ASSETS) if not (ROOT / name).is_file()]
     if missing:
         raise SystemExit("缺少构建资源：" + ", ".join(missing))
     site = ROOT / "dist" / "site"
@@ -35,11 +36,21 @@ def main(skip_ui=False):
         target = site / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, target)
+    for source, name in ONLINE_ASSETS.items():
+        target = site / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / source, target)
     # 发布文件使用内容寻址，避免新 HTML 搭配浏览器缓存中的同名旧 UI。
     # 源页面仍用固定入口，供开发和单 HTML 离线构建内联；worker 预缓存与发布页一致。
     html = (site / "index.html").read_text(encoding="utf-8")
     worker_text = (site / "sw.js").read_text(encoding="utf-8")
-    for name in ("assets/ui.js", "assets/ui.css"):
+    # 仅在线产物包含赞助入口；离线构建仍独立读取原始 HTML，不带广告链接或脚本。
+    footer = '<div class="footer">'
+    if html.count(footer) != 1 or html.count('</body>') != 1:
+        raise SystemExit("在线赞助入口的页面挂载点不唯一")
+    html = html.replace(footer, footer + '\n    <div id="gc-sponsor-slot" hidden></div>')
+    html = html.replace('</body>', '<script src="assets/sponsor.js" defer></script>\n</body>')
+    for name in ("assets/ui.js", "assets/ui.css", *ONLINE_ASSETS.values()):
         source = site / name
         fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
         versioned = source.with_name(f"{source.stem}.{fingerprint}{source.suffix}")
@@ -50,7 +61,7 @@ def main(skip_ui=False):
     (site / "index.html").write_text(html, encoding="utf-8")
     # 内容变动就更新 worker，HTML、CSS 和 JS 作为同一份快照预缓存。
     digest = hashlib.sha256()
-    for name in ASSETS:
+    for name in (*ASSETS, *ONLINE_ASSETS):
         digest.update(name.encode("utf-8"))
         digest.update((ROOT / name).read_bytes())
     worker = site / "sw.js"

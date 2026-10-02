@@ -64,6 +64,27 @@
   .data-badge { color: var(--text2); font-size: 12px; }
   .theme-button { min-height: 40px; border-radius: var(--radius-md); color: var(--text2); gap: 6px; }
   .app.workspace { max-width: 1600px; margin: 0 auto; padding: 24px 32px 16px; }
+  #gc-sponsor-slot[hidden] { display: none; }
+  .sponsor-entry { display: flex; align-items: center; gap: 24px; margin-block: 24px; padding: 24px; border-radius: var(--radius-lg); background: var(--surface-secondary); text-align: start; color: var(--text2); }
+  .sponsor-copy { flex: 1; min-width: 0; }
+  .sponsor-label { display: block; color: var(--text3); font-size: 11px; font-weight: 600; }
+  .sponsor-title { margin-block: 4px 8px; color: var(--text); font-size: 16px; font-weight: 650; }
+  .sponsor-description, .sponsor-privacy, .sponsor-frequency { margin-block: 6px 0; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+  .sponsor-frequency { color: var(--text3); }
+  .sponsor-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 240px; flex-shrink: 0; }
+  .footer .sponsor-link, .sponsor-dismiss { display: inline-flex; justify-content: center; align-items: center; min-height: 40px; padding: 9px 14px; border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; text-align: center; text-decoration: none; cursor: pointer; transition: transform 100ms ease-out, opacity 100ms ease-out; }
+  .footer .sponsor-link { background: var(--blue); color: var(--accent-foreground); }
+  .sponsor-dismiss { background: transparent; color: var(--text2); border: 0; }
+  .sponsor-link:active, .sponsor-dismiss:active { transform: scale(.97); }
+  @media (hover: hover) { .sponsor-link:hover, .sponsor-dismiss:hover { opacity: .85; } }
+  @media (max-width: 640px) {
+    .sponsor-entry { flex-direction: column; align-items: stretch; padding: 18px; gap: 16px; }
+    .sponsor-actions { max-width: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sponsor-link, .sponsor-dismiss { transition: none; }
+    .sponsor-link:active, .sponsor-dismiss:active { transform: none; }
+  }
   .page-heading { margin-bottom: 24px; }
   .topbar { display: grid; grid-template-columns: 1fr auto; gap: 4px 20px; padding: 0; margin: 0; }
   .topbar h1 { font-size: 26px; line-height: 1.3; font-weight: 650; letter-spacing: -.5px; }

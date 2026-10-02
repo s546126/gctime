@@ -6,7 +6,9 @@ EB-1 ~ EB-5 排期预测工具（EB-1A / EB-2 / EB-3 / EB-4 / EB-5 及三类 EB-
 
 ## 在线 Demo
 
-主站：https://gc.bracketboss2026.com/
+主站：https://bracketboss2026.com/ （www：https://www.bracketboss2026.com/）
+
+原地址继续可用：https://gc.bracketboss2026.com/
 
 备用站：https://s546126.github.io/gctime/
 
@@ -21,6 +23,14 @@ EB-1 ~ EB-5 排期预测工具（EB-1A / EB-2 / EB-3 / EB-4 / EB-5 及三类 EB-
 表 A/B 结果固定并列，不再选择其中一表。趋势图和等待图同时显示两表：绿色为表 A、琥珀色为表 B，历史实线、预测中位虚线、浅色阴影为 p10–p90 区间。乐观／中位／保守情景同时更新两张结果卡。历史光标展示同月 A/B 值，缺失月份明确提示；预测光标对照两表，等待图按同一 PD 插值，不超出各自范围外推。B 复用既有投影算法，不额外运行一轮模拟；是否可递交仍以 USCIS 本期用表为准。
 
 “分享链接”包含类别、出生国、优先日、速度、情景、供给、参数和界面语言，放在 URL `#` 片段内，不随 HTTP 请求发送。旧链接的 `view=A/B` 仍可打开，但两表始终同时展示，新链接不再携带选表参数。链接接收者先进入共享预览，不覆盖其已保存条件；点击“更新预测”才保存。“修改条件”打开或聚焦条件表单；“重新加载”重载当前发布版本，不主动抓取官方公告，保留档案但重置未保存的高级参数。
+
+## 自愿赞助与隐私
+
+在线页脚复用 Bracket Boss 2026 的 Adsterra Direct Link，入口可以关闭，24 小时内不重复展示。它不解锁任何功能，也不会自动跳转；不加载第三方广告脚本、统计 SDK、弹窗广告或倒计时门槛。仅 `bracketboss2026.com`、`www.bracketboss2026.com` 和 `gc.bracketboss2026.com` 的 HTTPS 在线页面启用，预览、GitHub Pages、本地和单文件离线版不展示。
+
+点击前不向广告网络发请求。点击会在新标签页打开固定广告链接，不附带类别、出生国、优先日、参数或分享片段，并禁止发送 Referer 和访问原窗口。广告方在打开后会收到 IP 地址、浏览器信息等正常连接数据，并可能使用 Cookie；其内容与隐私处理由广告方负责。本站只记录本地展示时间戳用于频控，不记录点击历史。
+
+广告平台对新站点内容／实际域名的批准、投放可用性及收入须由账户所有者在 Adsterra 后台核验；代码上线不等于已获平台批准。测试只使用拦截的广告目标，不点击真实广告。域名切换及回滚见 [运维说明](docs/domain-migration.md)。不同域名的浏览器存储相互独立；不强制跳转或清除档案，可用现有分享链接在地址之间转移条件。
 
 ## 方法
 
@@ -121,7 +131,7 @@ bash scripts/uscis_chart_watch.sh --install   # 每小时问一次 USCIS，直�
 
 1. GitHub Settings → Pages → Source 选择 **GitHub Actions**。初次启用需要仓库管理员，工作流 token 无权创建 Pages 站点。
 2. Cloudflare 创建 Pages 项目 `gctime`，生产分支 `main`。仓库 Secrets 配置 `CLOUDFLARE_API_TOKEN`（目标账户的 Cloudflare Pages:Edit）与 `CLOUDFLARE_ACCOUNT_ID`，然后设置仓库变量 `CLOUDFLARE_ENABLED=true`。启用后缺少凭据会明确失败；未启用时该发布 job 显示 skipped。
-3. Cloudflare Pages → gctime → Custom domains 绑定 `gc.bracketboss2026.com`。
+3. Cloudflare Pages → gctime → Custom domains 绑定 `bracketboss2026.com`、`www.bracketboss2026.com`、`gc.bracketboss2026.com`。从旧站迁移的根域名和 www 需先解除旧 Pages 绑定，再关联新项目；对应 CNAME 指向 `gctime.pages.dev`。
 4. 重新发布可运行 `gh workflow run ci.yml --repo s546126/gctime --ref main`；子工作流不能绕过 CI 独立发布。
 5. 从 HeroUI Pro Dashboard 获取 CI/CD token，设置仓库 Secret `HEROUI_AUTH_TOKEN`。该令牌仅传给 `npm rebuild @heroui-pro/react` 的授权下载步骤；其它依赖安装使用 `npm ci --ignore-scripts`。不要把令牌放入源码、前端环境变量或生成产物。
 
@@ -140,6 +150,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 ```
 
 `npm run build:ui` 把 `src/shell.jsx` 和 `src/styles.css` 编译为忽略提交的 `assets/ui.js`、`assets/ui.css`，不拆分 chunk、不生成 source map。`npm run build` 继续生成 `dist/site/`、`dist/EB1A.html` 和 `dist/EB1A-offline.zip`；直接运行 `python3 scripts/build_site.py` 也会先编译 UI。
+
+`src/sponsor.js` 由在线构建单独复制、指纹化并注入页脚，不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。
 
 `npm test` 自动完整构建，在真实子路径运行浏览器测试；CI 用 `GCTIME_PREBUILT=1` 复用刚验证的产物。离线 HTML 内联 React/HeroUI 的 JS 和 CSS，不需要 CDN 或本地服务器。站点 service worker 预缓存这些资源，并以构建内容指纹更新缓存。当前页面未自动注册 service worker；相关测试主动注册以验证分发的 worker，单 HTML 离线版无需注册。
 
