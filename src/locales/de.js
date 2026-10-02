@@ -1,4 +1,11 @@
 export default {
+  'sponsor.label': "Werbung · Freiwillige Unterstützung",
+  'sponsor.title': "Unterstütze den Betrieb von GC Time",
+  'sponsor.description': "Alle Prognosefunktionen sind verfügbar, ohne Werbung zu öffnen.",
+  'sponsor.privacy': "Beim Öffnen erhält der Werbeanbieter Verbindungsdaten wie deine IP-Adresse und Browserinformationen und kann Cookies verwenden. GC Time sendet keine von dir eingegebenen Prognosedaten.",
+  'sponsor.open': "Sponsorenlink öffnen (neuer Tab)",
+  'sponsor.dismiss': "Vorerst ausblenden",
+  'sponsor.frequency': "Jederzeit schließbar; wird in diesem Browser auf dieser Domain höchstens einmal alle 24 Stunden angezeigt.",
   'app.title': '{scope} Prognose · Green-Card-Wartezeit',
   'app.heading': '{category} Wartezeitprognose',
   'app.subtitle': '{country} · Monte-Carlo-Simulation',

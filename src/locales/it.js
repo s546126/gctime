@@ -1,5 +1,12 @@
 // Conservare chiavi, parametri, tag HTML e abbreviazioni tecniche.
 export default {
+  'sponsor.label': "Pubblicità · Supporto facoltativo",
+  'sponsor.title': "Sostieni la manutenzione di GC Time",
+  'sponsor.description': "Tutte le funzioni di previsione sono disponibili senza aprire pubblicità.",
+  'sponsor.privacy': "Aprendo il link, l’inserzionista riceverà dati di connessione, come l’indirizzo IP e informazioni sul browser, e potrà usare cookie. GC Time non invia i criteri che hai inserito per la previsione.",
+  'sponsor.open': "Apri il link sponsorizzato (nuova scheda)",
+  'sponsor.dismiss': "Nascondi per ora",
+  'sponsor.frequency': "Puoi chiuderlo in qualsiasi momento; viene mostrato al massimo una volta ogni 24 ore in questo browser e su questo dominio.",
   'app.title': 'Proiezione delle date di priorità di {scope} · Green Card',
   'app.heading': 'Proiezione delle date di {category}',
   'app.subtitle': '{country} · Simulazione Monte Carlo',

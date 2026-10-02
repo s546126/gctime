@@ -1,5 +1,12 @@
 // キー、補間変数、管理対象の HTML、識別子は原文と共通。
 export default {
+  'sponsor.label': "広告 · 任意のサポート",
+  'sponsor.title': "GC Time の運営をサポート",
+  'sponsor.description': "広告を開かなくても、すべての予測機能を利用できます。",
+  'sponsor.privacy': "リンクを開くと、広告主は IP アドレスやブラウザー情報などの接続データを受け取り、Cookie を使用する場合があります。GC Time が入力された予測条件を送信することはありません。",
+  'sponsor.open': "スポンサーリンクを開く（新しいタブ）",
+  'sponsor.dismiss': "今は表示しない",
+  'sponsor.frequency': "いつでも閉じられます。このブラウザー・ドメインでは 24 時間に最大 1 回表示されます。",
   'app.title': '{scope} 待機期間予測 · グリーンカード',
   'app.heading': '{category} 待機期間予測',
   'app.subtitle': '{country} · モンテカルロシミュレーションに基づく推計',

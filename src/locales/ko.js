@@ -1,5 +1,12 @@
 // 키, 보간 변수, 제어된 HTML 및 식별자는 원문과 동일하게 유지합니다.
 export default {
+  'sponsor.label': "광고 · 자발적 후원",
+  'sponsor.title': "GC Time 운영을 지원해 주세요",
+  'sponsor.description': "광고를 열지 않아도 모든 예측 기능을 이용할 수 있습니다.",
+  'sponsor.privacy': "링크를 열면 광고주에게 IP 주소, 브라우저 정보 등의 연결 데이터가 전달되며, 광고주가 쿠키를 사용할 수 있습니다. GC Time은 입력하신 예측 조건을 전송하지 않습니다.",
+  'sponsor.open': "후원 링크 열기 (새 탭)",
+  'sponsor.dismiss': "지금은 숨기기",
+  'sponsor.frequency': "언제든 닫을 수 있습니다. 이 브라우저와 도메인에서는 24시간에 최대 한 번 표시됩니다.",
   'app.title': '{scope} 문호 예측 · 영주권',
   'app.heading': '{category} 문호 예측',
   'app.subtitle': '{country} · 몬테카를로 시뮬레이션 기반',

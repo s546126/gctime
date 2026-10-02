@@ -46,7 +46,8 @@ def main(source_only=False):
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for path in sorted((ROOT / "scripts").glob("*.sh")):
         subprocess.run(["bash", "-n", str(path)], check=True)
-    for path in [*sorted((ROOT / "scripts").glob("*.mjs")), *sorted(ROOT.glob("*.js"))]:
+    for path in [*sorted((ROOT / "scripts").glob("*.mjs")), *sorted(ROOT.glob("*.js")),
+                 ROOT / "src" / "sponsor.js"]:
         subprocess.run(["node", "--check", str(path)], check=True)
     subprocess.run(["node", str(ROOT / "scripts" / "build_ui.mjs"), "--check"], cwd=ROOT, check=True)
     for path in [ROOT / "manifest.json", *sorted((ROOT / "data").glob("*.json"))]:
