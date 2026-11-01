@@ -6,7 +6,7 @@ export default {
   'sponsor.privacy': "링크를 열면 광고주에게 IP 주소, 브라우저 정보 등의 연결 데이터가 전달되며, 광고주가 쿠키를 사용할 수 있습니다. GC Time은 입력하신 예측 조건을 전송하지 않습니다.",
   'sponsor.open': "후원 링크 열기 (새 탭)",
   'sponsor.dismiss': "지금은 숨기기",
-  'sponsor.frequency': "언제든 닫을 수 있습니다. 이 브라우저와 도메인에서는 24시간에 최대 한 번 표시됩니다.",
+  'sponsor.frequency': "언제든 닫을 수 있습니다. 닫으면 약 3분 동안 숨겨지며, 그 후에는 페이지를 열 때마다 다시 표시됩니다.",
   'app.title': '{scope} 문호 예측 · 영주권',
   'app.heading': '{category} 문호 예측',
   'app.subtitle': '{country} · 몬테카를로 시뮬레이션 기반',

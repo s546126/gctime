@@ -44,12 +44,13 @@ def main(skip_ui=False):
     # 源页面仍用固定入口，供开发和单 HTML 离线构建内联；worker 预缓存与发布页一致。
     html = (site / "index.html").read_text(encoding="utf-8")
     worker_text = (site / "sw.js").read_text(encoding="utf-8")
-    # 仅在线产物包含赞助入口；离线构建仍独立读取原始 HTML，不带广告链接或脚本。
-    footer = '<div class="footer">'
-    if html.count(footer) != 1 or html.count('</body>') != 1:
+    # 仅在线产物包含视口底部赞助条；离线构建仍独立读取原始 HTML，不带广告链接或脚本。
+    if html.count('</body>') != 1 or 'gc-sponsor-slot' in html:
         raise SystemExit("在线赞助入口的页面挂载点不唯一")
-    html = html.replace(footer, footer + '\n    <div id="gc-sponsor-slot" hidden></div>')
-    html = html.replace('</body>', '<script src="assets/sponsor.js" defer></script>\n</body>')
+    html = html.replace(
+        '</body>',
+        '<div id="gc-sponsor-slot" hidden></div>\n<script src="assets/sponsor.js" defer></script>\n</body>',
+    )
     for name in ("assets/ui.js", "assets/ui.css", *ONLINE_ASSETS.values()):
         source = site / name
         fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()[:16]

@@ -1,4 +1,8 @@
-/* 仅由在线构建注入；预测引擎和离线包不依赖本模块。 */
+/* 仅由在线构建注入；预测引擎和离线包不依赖本模块。
+   可调参数：
+   - SHOW_DELAY_MS：进入页面后多久显示底部横幅。
+   - DISMISS_MS：点击「关闭」后的隐藏时长。每次页面加载都会再显示，除非仍处在该窗口内。
+   点击赞助链接只收起当前这一次浏览，不写入更长的隐藏时间。 */
 ;(function () {
   'use strict'
 
@@ -10,18 +14,30 @@
   if (!slot || !i18n || slot.childElementCount) return
 
   const storageKey = 'gc_sponsor_last_shown'
-  const interval = 24 * 60 * 60 * 1000
+  const SHOW_DELAY_MS = 1000
+  const DISMISS_MS = 3 * 60 * 1000
   const now = Date.now()
+
+  function dismissed(last) {
+    return Number.isFinite(last) && last > 0 && now - last < DISMISS_MS
+  }
+
   try {
-    const last = Number(localStorage.getItem(storageKey))
-    if (Number.isFinite(last) && last > 0 && now - last < interval) {
+    // 先确认本地存储可写。无法可靠记录关闭时间时不展示，避免关不掉。
+    const raw = localStorage.getItem(storageKey)
+    if (raw === null) {
+      localStorage.setItem(storageKey, '0')
+      localStorage.removeItem(storageKey)
+    } else {
+      localStorage.setItem(storageKey, raw)
+    }
+    const last = Number(raw)
+    if (dismissed(last)) {
       // 时钟回拨不造成反复展示；修正未来值，从本次访问重新计时。
       if (last > now) localStorage.setItem(storageKey, String(now))
       return
     }
-    localStorage.setItem(storageKey, String(now))
   } catch {
-    // 无法可靠频控时不展示；不影响预测、分享和离线功能。
     return
   }
 
@@ -56,27 +72,63 @@
   dismiss.id = 'gc-sponsor-dismiss'
   dismiss.type = 'button'
 
+  let timer = 0
+  let observer = null
   function render() {
     for (const [element, key] of messages) element.textContent = i18n.text(key)
+    reserve()
+  }
+  function reserve() {
+    const height = slot.hidden ? 0 : Math.ceil(slot.getBoundingClientRect().height)
+    document.documentElement.style.setProperty('--gc-sponsor-reserve', height + 'px')
   }
   function hide() {
+    window.clearTimeout(timer)
     slot.hidden = true
+    reserve()
     window.removeEventListener('gc:localechange', render)
     window.removeEventListener('offline', hide)
+    window.removeEventListener('resize', reserve)
     window.removeEventListener('storage', syncFrequency)
+    if (window.visualViewport) window.visualViewport.removeEventListener('resize', reserve)
+    if (observer) observer.disconnect()
   }
   function syncFrequency(event) {
-    if (event.key === storageKey && Number(event.newValue) >= now) hide()
+    if (event.key !== storageKey) return
+    const value = Number(event.newValue)
+    if (Number.isFinite(value) && value > 0 && (value >= now || now - value < DISMISS_MS)) hide()
   }
+  function reveal() {
+    if (navigator.onLine === false) return
+    try {
+      const last = Number(localStorage.getItem(storageKey))
+      if (Number.isFinite(last) && last > 0 && Date.now() - last < DISMISS_MS) return
+    } catch {
+      return
+    }
+    slot.hidden = false
+    reserve()
+  }
+  function rememberDismiss() {
+    try { localStorage.setItem(storageKey, String(Date.now())) } catch { /* 写失败也先关掉当前页。 */ }
+    hide()
+  }
+
   render()
   region.append(copy, actions)
   slot.appendChild(region)
-  slot.hidden = false
+  if (typeof ResizeObserver === 'function') {
+    observer = new ResizeObserver(() => reserve())
+    observer.observe(slot)
+  }
   // 保留原生链接导航；不检测广告是否展示，也不解锁／限制任何功能。
   link.addEventListener('click', hide)
   link.addEventListener('auxclick', event => { if (event.button === 1) hide() })
-  dismiss.addEventListener('click', hide)
+  dismiss.addEventListener('click', rememberDismiss)
   window.addEventListener('gc:localechange', render)
   window.addEventListener('offline', hide)
+  window.addEventListener('resize', reserve)
   window.addEventListener('storage', syncFrequency)
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', reserve)
+  timer = window.setTimeout(reveal, SHOW_DELAY_MS)
 })()

@@ -6,6 +6,10 @@ const { createHash } = require('node:crypto')
 const site = resolve(__dirname, '../dist/site')
 const adUrl = 'https://www.effectivecpmnetwork.com/bekmfyfbe?key=9b81ed84d79cc96e111986555f43381f'
 const storageKey = 'gc_sponsor_last_shown'
+const sponsorSource = readFileSync(resolve(__dirname, '../src/sponsor.js'), 'utf8')
+const showDelay = Number(sponsorSource.match(/const SHOW_DELAY_MS = (\d+)/)[1])
+const dismissFactors = sponsorSource.match(/const DISMISS_MS = (\d+) \* (\d+) \* (\d+)/).slice(1)
+const dismissWindow = dismissFactors.reduce((total, part) => total * Number(part), 1)
 const day = 24 * 60 * 60 * 1000
 const now = Date.UTC(2026, 9, 1, 12)
 const test = base.extend({
@@ -18,7 +22,7 @@ const test = base.extend({
 })
 
 // 全部线上域名由本地构建产物替身响应，广告点击永远不连接真实网络。
-async function openSite(page, context, { origin = 'https://bracketboss2026.com', last, storageFails, offline = false, blockSponsor = false } = {}) {
+async function openSite(page, context, { origin = 'https://bracketboss2026.com', last, storageFails, offline = false, blockSponsor = false, reveal = true } = {}) {
   const external = []
   await context.route('**/*', async route => {
     const url = new URL(route.request().url())
@@ -52,6 +56,7 @@ async function openSite(page, context, { origin = 'https://bracketboss2026.com',
   await page.goto(origin + '/?unrelated=private#private-priority-date')
   await expect(page.locator('#gc-root')).toHaveAttribute('data-ui', 'heroui-pro')
   await expect(page.locator('#hero-value')).not.toHaveText('--')
+  if (reveal) await page.clock.runFor(showDelay)
   return external
 }
 
@@ -64,9 +69,10 @@ for (const host of ['bracketboss2026.com', 'www.bracketboss2026.com', 'gc.bracke
     await expect(page.locator('#welcome-modal')).toBeHidden()
     await expect(page.locator('#ab-status .ab-chip')).toHaveCount(2)
     expect(external).toEqual([])
-    expect(await page.evaluate(key => Number(localStorage.getItem(key)), storageKey)).toBe(now)
+    expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
     await page.locator('#gc-sponsor-dismiss').click()
     await expect(slot).toBeHidden()
+    expect(await page.evaluate(key => Number(localStorage.getItem(key)), storageKey)).toBe(now)
     await page.reload()
     await expect(slot).toBeHidden()
     expect(external).toEqual([])
@@ -84,10 +90,11 @@ for (const origin of ['http://bracketboss2026.com', 'https://bracketboss2026.com
 }
 
 for (const [label, last, visible] of [
-  ['recent', String(now - 1000), false],
-  ['under 24 hours', String(now - day + 1), false],
-  ['24 hours', String(now - day), true],
-  ['expired', String(now - day - 1), true],
+  ['just dismissed', String(now - 1000), false],
+  ['inside 3 minutes', String(now - dismissWindow + 1), false],
+  ['3 minutes', String(now - dismissWindow), true],
+  ['expired', String(now - dismissWindow - 1), true],
+  ['previous 24 hour cap', String(now - day + 1), true],
   ['malformed', 'garbage', true],
   ['infinite', 'Infinity', true],
   ['negative', '-1', true],
@@ -128,7 +135,11 @@ test('only an explicit click opens fixed isolated destination without profile or
   expect(external).toEqual([{ url: adUrl, referer: undefined }])
   await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
   expect(await page.evaluate(() => ({ rng: _rngState, result: document.querySelector('#ab-status').textContent, hash: location.hash }))).toEqual(before)
+  expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
   await popup.close()
+  await page.reload()
+  await page.clock.runFor(showDelay)
+  await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
 })
 
 test('blocked navigation and dismiss never gate core features', async ({ page, context }) => {
@@ -179,10 +190,19 @@ for (const width of [375, 1440]) {
     for (const locale of languages) {
       await page.evaluate(locale => GCI18n.setLocale(locale), locale)
       await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
-      const labels = await page.evaluate(() => ({ open: GCI18n.text('sponsor.open'), privacy: GCI18n.text('sponsor.privacy') }))
+      const labels = await page.evaluate(() => ({
+        open: GCI18n.text('sponsor.open'),
+        privacy: GCI18n.text('sponsor.privacy'),
+        frequency: GCI18n.text('sponsor.frequency'),
+        label: GCI18n.text('sponsor.label')
+      }))
+      expect(labels.frequency).not.toMatch(/24/)
+      expect(labels.frequency).toMatch(/3/)
       await expect(page.locator('#gc-sponsor-link')).toHaveText(labels.open)
       await expect(page.locator('#gc-sponsor-slot')).toContainText(labels.privacy)
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+      await expect(page.locator('#gc-sponsor-slot')).toContainText(labels.frequency)
+      await expect(page.locator('.sponsor-label')).toHaveText(labels.label)
+      expect(await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) <= window.innerWidth + 1)).toBe(true)
       expect(await page.evaluate(() => _rngState)).toBe(rng)
       if (locale === 'ar') {
         await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
@@ -191,6 +211,77 @@ for (const width of [375, 1440]) {
     }
     await page.evaluate(() => GCI18n.setLocale('zh-CN'))
     await page.locator('#gc-sponsor-slot').screenshot({ path: testInfo.outputPath(`sponsor-zh-${width}.png`) })
+  })
+}
+
+test('banner stays hidden until the short delay elapses', async ({ page, context }) => {
+  await openSite(page, context, { reveal: false })
+  const slot = page.locator('#gc-sponsor-slot')
+  await expect(slot).toBeHidden()
+  await page.clock.runFor(showDelay)
+  await expect(slot).toBeVisible()
+})
+
+test('dismiss hides only for the short window, then the next page load shows it again', async ({ page, context }) => {
+  await openSite(page, context)
+  await page.locator('#gc-sponsor-dismiss').click()
+  await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+  await page.clock.setFixedTime(now + dismissWindow - 1)
+  await page.reload()
+  await page.clock.runFor(showDelay)
+  await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+  await page.clock.setFixedTime(now + dismissWindow)
+  await page.reload()
+  await page.clock.runFor(showDelay)
+  await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
+})
+
+for (const width of [375, 1440]) {
+  test(`fixed banner stays in view at ${width}px and clears primary controls`, async ({ page, context }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await openSite(page, context)
+    const slot = page.locator('#gc-sponsor-slot')
+    await expect(slot).toBeVisible()
+    expect(await slot.evaluate(element => element.parentElement.tagName)).toBe('BODY')
+    await expect(slot).toHaveCSS('position', 'fixed')
+    const metrics = await page.evaluate(() => {
+      const slot = document.getElementById('gc-sponsor-slot')
+      const root = document.getElementById('gc-root')
+      const banner = slot.getBoundingClientRect()
+      const share = document.getElementById('share-btn').getBoundingClientRect()
+      const reserve = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gc-sponsor-reserve'))
+      root.scrollTop = root.scrollHeight
+      const workspace = root.getBoundingClientRect()
+      const footer = document.querySelector('.footer').getBoundingClientRect()
+      const above = document.elementFromPoint(Math.floor(window.innerWidth / 2), Math.max(0, banner.top - 2))
+      return {
+        bannerTop: banner.top,
+        bannerBottom: banner.bottom,
+        bannerLeft: banner.left,
+        bannerWidth: banner.width,
+        bannerHeight: banner.height,
+        workspaceBottom: workspace.bottom,
+        innerHeight: window.innerHeight,
+        innerWidth: window.innerWidth,
+        footerBottom: footer.bottom,
+        shareBottom: share.bottom,
+        reserve,
+        scrollWidth: Math.max(document.documentElement.scrollWidth, root.scrollWidth),
+        aboveIsBanner: slot.contains(above),
+        scrolled: root.scrollTop > 0
+      }
+    })
+    expect(metrics.bannerLeft).toBeLessThanOrEqual(1)
+    expect(metrics.bannerWidth).toBeGreaterThanOrEqual(metrics.innerWidth - 1)
+    expect(Math.abs(metrics.bannerBottom - metrics.innerHeight)).toBeLessThanOrEqual(1)
+    expect(metrics.bannerTop).toBeGreaterThan(metrics.innerHeight * 0.45)
+    expect(metrics.reserve).toBeGreaterThanOrEqual(metrics.bannerHeight - 1)
+    expect(Math.abs(metrics.workspaceBottom - metrics.bannerTop)).toBeLessThanOrEqual(2)
+    expect(metrics.scrolled).toBe(true)
+    expect(metrics.footerBottom).toBeLessThanOrEqual(metrics.bannerTop + 1)
+    expect(metrics.shareBottom).toBeLessThanOrEqual(metrics.bannerTop + 1)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth + 1)
+    expect(metrics.aboveIsBanner).toBe(false)
   })
 }
 

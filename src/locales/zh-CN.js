@@ -6,7 +6,7 @@ export default {
   'sponsor.privacy': "打开后，广告方会收到 IP 地址、浏览器信息等连接数据，并可能使用 Cookie。GC Time 不会发送你输入的排期条件。",
   'sponsor.open': "打开赞助链接（新标签页）",
   'sponsor.dismiss': "暂不显示",
-  'sponsor.frequency': "可随时关闭；此浏览器在此域名下每 24 小时最多展示一次。",
+  'sponsor.frequency': "可随时关闭。关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。",
   'app.title': '{scope} 排期推演 · 绿卡排期',
   'app.heading': '{category} 排期推演',
   'app.subtitle': '{country} · 基于蒙特卡洛模拟',
