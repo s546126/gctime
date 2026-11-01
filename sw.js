@@ -27,6 +27,7 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
+  // 只处理本站资源。跨源广告脚本不拦截、不预缓存，避免把广告响应写进本站缓存。
   if (new URL(req.url).origin !== self.location.origin) return;
   var accept = req.headers.get('accept') || '';
   // 导航 / HTML：网络优先，离线回退缓存。
