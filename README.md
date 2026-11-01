@@ -28,9 +28,9 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 
 ## 自愿赞助与隐私
 
-在线页面底部有一条固定的自愿赞助横幅，复用 Bracket Boss 2026 的 Adsterra Direct Link。横幅在每次打开页面约 1 秒后出现。工作区高度会减去横幅高度（含底部安全区），正文在横幅上方滚动，不挡住主要操作。入口可以关闭；关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。点击赞助链接只收起当前这一次浏览。它不解锁任何功能，也不会自动跳转；不加载第三方广告脚本、统计 SDK、弹窗广告或倒计时门槛。仅 `bracketboss2026.com`、`www.bracketboss2026.com` 和 `gc.bracketboss2026.com` 的 HTTPS 在线页面启用，预览、GitHub Pages、本地和单文件离线版不展示。
+在线页面底部有一条固定的自愿赞助横幅，里面直接展示 Adsterra 横幅广告，不再打开 Direct Link，也不会自动跳转。视口宽度大于等于 768 像素时只用 728×90（`https://bauval.org/22/6d1946abad3d3fdcc79373556a137876`），更窄时只用 320×50（`https://bauval.org/22/d450c9cf5ef416c8ffc1907634e0d6e6`）；每次页面只注入一个单元。横幅在进入页面约 1 秒后出现，广告位按创意高度预留，工作区高度会减去整条横幅（含底部安全区）。可以关闭；关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。广告脚本若被拦截或约 4 秒内没有出现 iframe，横幅会收起，不留空条。它不解锁任何功能。仅 `bracketboss2026.com`、`www.bracketboss2026.com` 和 `gc.bracketboss2026.com` 的 HTTPS 在线页面启用，预览、GitHub Pages、本地和单文件离线版不展示。
 
-点击前不向广告网络发请求。点击会在新标签页打开固定广告链接，不附带类别、出生国、优先日、参数或分享片段，并禁止发送 Referer 和访问原窗口。广告方在打开后会收到 IP 地址、浏览器信息等正常连接数据，并可能使用 Cookie；其内容与隐私处理由广告方负责。本站只在关闭横幅时记录本地时间戳，用来实现这几分钟的隐藏，不记录点击历史。
+仓库里没有 CSP meta 或 `_headers`。Service Worker 对非本站请求直接放过，不缓存 `bauval.org`。广告网络在加载横幅时会收到 IP 地址、浏览器信息等连接数据，并可能使用 Cookie；本站不把排期条件放进广告参数。本站只在关闭横幅时记录本地时间戳，用来实现这几分钟的隐藏。
 
 广告平台对新站点内容／实际域名的批准、投放可用性及收入须由账户所有者在 Adsterra 后台核验；代码上线不等于已获平台批准。测试只使用拦截的广告目标，不点击真实广告。域名切换及回滚见 [运维说明](docs/domain-migration.md)。不同域名的浏览器存储相互独立；不强制跳转或清除档案，可用现有分享链接在地址之间转移条件。
 
@@ -155,7 +155,7 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
 `npm run build:ui` 把 `src/shell.jsx` 和 `src/styles.css` 编译为忽略提交的 `assets/ui.js`、`assets/ui.css`，不拆分 chunk、不生成 source map。`npm run build` 继续生成 `dist/site/`、`dist/EB1A.html` 和 `dist/EB1A-offline.zip`；直接运行 `python3 scripts/build_site.py` 也会先编译 UI。
 
-`src/sponsor.js` 由在线构建单独复制、指纹化并注入页面底部（固定在视口底边，不进入页脚文档流），不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。展示延迟 `SHOW_DELAY_MS` 与关闭隐藏时长 `DISMISS_MS` 写在该文件顶部。
+`src/sponsor.js` 由在线构建单独复制、指纹化并注入页面底部（固定在视口底边，不进入页脚文档流），不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。展示延迟 `SHOW_DELAY_MS`、关闭隐藏时长 `DISMISS_MS` 和广告加载超时 `AD_LOAD_TIMEOUT_MS` 写在该文件顶部。
 
 `npm test` 自动完整构建，在真实子路径运行浏览器测试；CI 用 `GCTIME_PREBUILT=1` 复用刚验证的产物。离线 HTML 内联 React/HeroUI 的 JS 和 CSS，不需要 CDN 或本地服务器。站点 service worker 预缓存这些资源，并以构建内容指纹更新缓存。当前页面未自动注册 service worker；相关测试主动注册以验证分发的 worker，单 HTML 离线版无需注册。
 

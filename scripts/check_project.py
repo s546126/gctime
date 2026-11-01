@@ -41,7 +41,8 @@ class PageChecks(HTMLParser):
             self.inline = False
 
 
-AD_URL = "https://www.effectivecpmnetwork.com/bekmfyfbe?key=9b81ed84d79cc96e111986555f43381f"
+DESKTOP_AD = "https://bauval.org/22/6d1946abad3d3fdcc79373556a137876"
+MOBILE_AD = "https://bauval.org/22/d450c9cf5ef416c8ffc1907634e0d6e6"
 PRODUCTION_HOSTS = (
     "bracketboss2026.com",
     "www.bracketboss2026.com",
@@ -51,17 +52,21 @@ PRODUCTION_HOSTS = (
 
 def check_sponsor():
     source = (ROOT / "src" / "sponsor.js").read_text(encoding="utf-8")
-    if source.count(AD_URL) != 1:
-        raise SystemExit("赞助链接必须与固定地址完全一致，且只出现一次")
+    if source.count(DESKTOP_AD) != 1 or source.count(MOBILE_AD) != 1:
+        raise SystemExit("桌面与移动广告脚本地址必须各出现一次，且与后台给出的 URL 一致")
+    if "effectivecpmnetwork" in source or "target = '_blank'" in source or "sponsor.open" in source:
+        raise SystemExit("赞助横幅不应再使用 Direct Link 或新标签页按钮")
     for host in PRODUCTION_HOSTS:
         if f"'{host}'" not in source:
             raise SystemExit(f"赞助宿主缺失：{host}")
     for snippet in (
         "location.protocol !== 'https:'",
-        "rel = 'sponsored noopener noreferrer'",
-        "target = '_blank'",
         "const SHOW_DELAY_MS = 1000",
         "const DISMISS_MS = 3 * 60 * 1000",
+        "const AD_LOAD_TIMEOUT_MS = 4000",
+        "const DESKTOP_MIN_WIDTH = 768",
+        "format: 'iframe'",
+        "window.atOptions",
         "navigator.onLine === false",
     ):
         if snippet not in source:
@@ -73,30 +78,51 @@ def check_sponsor():
         "#gc-sponsor-slot:not([hidden])",
         "position: fixed",
         "--gc-sponsor-reserve",
+        "--gc-ad-height: 90px",
+        "--gc-ad-height: 50px",
         "env(safe-area-inset-bottom)",
+        "min-height: var(--gc-ad-height)",
     ):
         if snippet not in styles:
             raise SystemExit(f"赞助样式缺少约束：{snippet}")
+    worker = (ROOT / "sw.js").read_text(encoding="utf-8")
+    if "bauval.org" in worker or "effectivecpmnetwork" in worker:
+        raise SystemExit("Service Worker 不应预缓存或改写广告脚本")
+    if "origin !== self.location.origin" not in worker:
+        raise SystemExit("Service Worker 必须放过跨源请求，避免拦截广告脚本")
     build = (ROOT / "scripts" / "build_site.py").read_text(encoding="utf-8")
     if "footer + '\\n    <div id=\"gc-sponsor-slot\"'" in build:
         raise SystemExit("赞助槽不应再注入页脚")
     if '<div id="gc-sponsor-slot" hidden></div>' not in build:
         raise SystemExit("在线构建必须注入赞助槽")
-    if 'id="gc-sponsor-slot"' in (ROOT / "index.html").read_text(encoding="utf-8"):
-        raise SystemExit("源页面和离线页不能包含赞助槽")
+    page_source = (ROOT / "index.html").read_text(encoding="utf-8")
+    if 'id="gc-sponsor-slot"' in page_source or "bauval.org" in page_source or "effectivecpmnetwork" in page_source:
+        raise SystemExit("源页面和离线页不能包含赞助槽或广告地址")
+    policies = [page_source]
+    headers = ROOT / "_headers"
+    if headers.is_file():
+        policies.append(headers.read_text(encoding="utf-8"))
+    for policy in policies:
+        if "Content-Security-Policy" in policy and "bauval.org" not in policy:
+            raise SystemExit("CSP 必须允许 bauval.org 的脚本和框架")
     for path in sorted((ROOT / "src" / "locales").glob("*.js")):
-        frequency = None
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if "'sponsor.frequency'" not in line:
-                continue
-            frequency = line.split(":", 1)[1].strip().strip(",").strip("\"'")
-            break
-        if not frequency:
-            raise SystemExit(f"缺少 sponsor.frequency：{path.name}")
+        text = path.read_text(encoding="utf-8")
+        if "sponsor.open" in text or "sponsor.title" in text:
+            raise SystemExit(f"{path.name} 仍保留打开赞助链接的文案键")
+        frequency = privacy = None
+        for line in text.splitlines():
+            if "'sponsor.frequency'" in line:
+                frequency = line.split(":", 1)[1]
+            if "'sponsor.privacy'" in line:
+                privacy = line.split(":", 1)[1]
+        if not frequency or not privacy:
+            raise SystemExit(f"缺少赞助文案：{path.name}")
         if "24" in frequency:
             raise SystemExit(f"{path.name} 仍写着 24 小时频控")
         if "3" not in frequency:
             raise SystemExit(f"{path.name} 的频控文案需要说明约 3 分钟")
+        if "IP" not in privacy:
+            raise SystemExit(f"{path.name} 的隐私说明需要写明广告网络可能收到 IP")
 
 
 def main(source_only=False):

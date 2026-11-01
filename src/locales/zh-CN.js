@@ -1,10 +1,7 @@
 // 翻译契约：保留键名、{占位参数}、受控 HTML 标签和专业缩写；不要翻译数据 ID。
 export default {
   'sponsor.label': "广告 · 自愿支持",
-  'sponsor.title': "支持 GC Time 的维护",
-  'sponsor.description': "无需打开广告，所有预测功能始终可用。",
-  'sponsor.privacy': "打开后，广告方会收到 IP 地址、浏览器信息等连接数据，并可能使用 Cookie。GC Time 不会发送你输入的排期条件。",
-  'sponsor.open': "打开赞助链接（新标签页）",
+  'sponsor.privacy': "横幅中的广告由广告网络提供。广告网络可能会收到 IP 地址、浏览器信息等连接数据，并可能使用 Cookie。GC Time 不会发送你输入的排期条件。",
   'sponsor.dismiss': "暂不显示",
   'sponsor.frequency': "可随时关闭。关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。",
   'app.title': '{scope} 排期推演 · 绿卡排期',

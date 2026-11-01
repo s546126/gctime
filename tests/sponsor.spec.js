@@ -4,13 +4,29 @@ const { resolve, extname } = require('node:path')
 const { createHash } = require('node:crypto')
 
 const site = resolve(__dirname, '../dist/site')
-const adUrl = 'https://www.effectivecpmnetwork.com/bekmfyfbe?key=9b81ed84d79cc96e111986555f43381f'
 const storageKey = 'gc_sponsor_last_shown'
 const sponsorSource = readFileSync(resolve(__dirname, '../src/sponsor.js'), 'utf8')
 const showDelay = Number(sponsorSource.match(/const SHOW_DELAY_MS = (\d+)/)[1])
+const adLoadTimeout = Number(sponsorSource.match(/const AD_LOAD_TIMEOUT_MS = (\d+)/)[1])
 const dismissFactors = sponsorSource.match(/const DISMISS_MS = (\d+) \* (\d+) \* (\d+)/).slice(1)
 const dismissWindow = dismissFactors.reduce((total, part) => total * Number(part), 1)
+const adSrcs = sponsorSource.match(/https:\/\/bauval\.org\/22\/[a-f0-9]{32}/g)
+const [desktopSrc, mobileSrc] = adSrcs
+const desktopKey = desktopSrc.slice(desktopSrc.lastIndexOf('/') + 1)
+const mobileKey = mobileSrc.slice(mobileSrc.lastIndexOf('/') + 1)
 const day = 24 * 60 * 60 * 1000
+const iframeStub = `(function () {
+  var options = window.atOptions || {}
+  var script = document.currentScript
+  var frame = document.createElement('iframe')
+  frame.width = String(options.width || '')
+  frame.height = String(options.height || '')
+  frame.setAttribute('data-ad-key', options.key || '')
+  frame.title = 'Advertisement'
+  frame.src = 'about:blank'
+  if (script && script.parentNode) script.parentNode.insertBefore(frame, script.nextSibling)
+})()`
+const writeStub = `document.write('<iframe data-ad-key="' + window.atOptions.key + '" width="' + window.atOptions.width + '" height="' + window.atOptions.height + '" title="Advertisement" src="about:blank"></iframe>')`
 const now = Date.UTC(2026, 9, 1, 12)
 const test = base.extend({
   page: async ({ page }, use) => {
@@ -21,13 +37,17 @@ const test = base.extend({
   }
 })
 
-// 全部线上域名由本地构建产物替身响应，广告点击永远不连接真实网络。
-async function openSite(page, context, { origin = 'https://bracketboss2026.com', last, storageFails, offline = false, blockSponsor = false, reveal = true } = {}) {
+// 全部线上域名由本地构建产物替身响应。Adsterra 脚本被本地替身替换，测试不访问广告网络。
+async function openSite(page, context, { origin = 'https://bracketboss2026.com', last, storageFails, offline = false, blockSponsor = false, blockAd = false, adMode = 'iframe', reveal = true } = {}) {
   const external = []
   await context.route('**/*', async route => {
     const url = new URL(route.request().url())
     if (url.origin !== origin) {
       external.push({ url: url.href, referer: route.request().headers().referer })
+      if (url.hostname === 'bauval.org') {
+        if (blockAd) return route.abort()
+        return route.fulfill({ contentType: 'text/javascript', body: adMode === 'write' ? writeStub : iframeStub })
+      }
       return route.fulfill({ contentType: 'text/html', body: '<title>Mock sponsor destination</title>' })
     }
     const path = resolve(site, '.' + (url.pathname === '/' ? '/index.html' : url.pathname))
@@ -68,14 +88,17 @@ for (const host of ['bracketboss2026.com', 'www.bracketboss2026.com', 'gc.bracke
     await expect(slot).toContainText('广告')
     await expect(page.locator('#welcome-modal')).toBeHidden()
     await expect(page.locator('#ab-status .ab-chip')).toHaveCount(2)
-    expect(external).toEqual([])
+    expect(external.map(item => item.url)).toEqual([mobileSrc])
+    expect(external[0].referer || '').not.toMatch(/#|private-priority-date|eb1a_user_profile/)
+    await expect(page.locator('#gc-sponsor-link')).toHaveCount(0)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
     expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
     await page.locator('#gc-sponsor-dismiss').click()
     await expect(slot).toBeHidden()
     expect(await page.evaluate(key => Number(localStorage.getItem(key)), storageKey)).toBe(now)
     await page.reload()
     await expect(slot).toBeHidden()
-    expect(external).toEqual([])
+    expect(external).toHaveLength(1)
   })
 }
 
@@ -83,7 +106,7 @@ for (const origin of ['http://bracketboss2026.com', 'https://bracketboss2026.com
   test(`sponsor disabled at ${origin}`, async ({ page, context }) => {
     const external = await openSite(page, context, { origin })
     await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
-    await expect(page.locator('#gc-sponsor-link')).toHaveCount(0)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(0)
     expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
     expect(external).toEqual([])
   })
@@ -101,9 +124,14 @@ for (const [label, last, visible] of [
   ['future', String(now + day), false]
 ]) {
   test(`frequency cap: ${label}`, async ({ page, context }) => {
-    await openSite(page, context, { last })
-    if (visible) await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
-    else await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+    const external = await openSite(page, context, { last })
+    if (visible) {
+      await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
+      expect(external.map(item => item.url)).toEqual([mobileSrc])
+    } else {
+      await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+      expect(external).toEqual([])
+    }
   })
 }
 
@@ -117,35 +145,61 @@ for (const storageFails of ['getItem', 'setItem']) {
   })
 }
 
-test('only an explicit click opens fixed isolated destination without profile or referrer', async ({ page, context }) => {
-  const external = await openSite(page, context)
-  const link = page.locator('#gc-sponsor-link')
-  await expect(link).toHaveAttribute('href', adUrl)
-  await expect(link).toHaveAttribute('target', '_blank')
-  await expect(link).toHaveAttribute('referrerpolicy', 'no-referrer')
-  for (const token of ['sponsored', 'noopener', 'noreferrer']) await expect(link).toHaveAttribute('rel', new RegExp(`\\b${token}\\b`))
-  const before = await page.evaluate(() => ({ rng: _rngState, result: document.querySelector('#ab-status').textContent, hash: location.hash }))
-  expect(external).toEqual([])
-  const popupPromise = context.waitForEvent('page')
-  await link.click()
-  const popup = await popupPromise
-  await popup.waitForLoadState()
-  expect(popup.url()).toBe(adUrl)
-  expect(await popup.evaluate(() => ({ opener: window.opener, referrer: document.referrer }))).toEqual({ opener: null, referrer: '' })
-  expect(external).toEqual([{ url: adUrl, referer: undefined }])
-  await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
-  expect(await page.evaluate(() => ({ rng: _rngState, result: document.querySelector('#ab-status').textContent, hash: location.hash }))).toEqual(before)
-  expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull()
-  await popup.close()
-  await page.reload()
-  await page.clock.runFor(showDelay)
-  await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
+test('the banner shows one iframe unit and does not navigate or open a tab', async ({ page, context }) => {
+  const before = await openSite(page, context).then(async external => {
+    const state = await page.evaluate(() => ({ rng: _rngState, result: document.querySelector('#ab-status').textContent, hash: location.hash }))
+    return { external, state }
+  })
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
+  await expect(page.locator('#gc-sponsor-ad script')).toHaveCount(1)
+  expect(await page.evaluate(() => window.atOptions)).toEqual({ key: mobileKey, format: 'iframe', height: 50, width: 320, params: {} })
+  expect(before.external.map(item => item.url)).toEqual([mobileSrc])
+  expect(context.pages()).toHaveLength(1)
+  expect(await page.evaluate(() => ({ rng: _rngState, result: document.querySelector('#ab-status').textContent, hash: location.hash }))).toEqual(before.state)
+  expect(await page.evaluate(() => document.documentElement.innerHTML.includes('effectivecpmnetwork'))).toBe(false)
 })
 
-test('blocked navigation and dismiss never gate core features', async ({ page, context }) => {
+for (const [width, src, key, frameWidth, frameHeight] of [
+  [767, mobileSrc, mobileKey, '320', '50'],
+  [768, desktopSrc, desktopKey, '728', '90'],
+  [1440, desktopSrc, desktopKey, '728', '90']
+]) {
+  test(`viewport ${width}px loads only the ${frameWidth}x${frameHeight} unit`, async ({ page, context }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const external = await openSite(page, context)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveAttribute('data-ad-key', key)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveAttribute('width', frameWidth)
+    await expect(page.locator('#gc-sponsor-ad iframe')).toHaveAttribute('height', frameHeight)
+    expect(external.map(item => item.url)).toEqual([src])
+    await page.setViewportSize({ width: width >= 768 ? 375 : 1440, height: 900 })
+    await expect(page.locator('#gc-sponsor-ad script')).toHaveCount(1)
+    expect(external.map(item => item.url)).toEqual([src])
+  })
+}
+
+test('document.write from the ad script stays inside the banner', async ({ page, context }) => {
+  await openSite(page, context, { adMode: 'write' })
+  await expect(page.locator('#gc-root')).toHaveAttribute('data-ui', 'heroui-pro')
+  await expect(page.locator('#hero-value')).not.toHaveText('--')
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveAttribute('data-ad-key', mobileKey)
+  expect(context.pages()).toHaveLength(1)
+})
+
+test('a blocked ad script hides the bar instead of leaving it empty', async ({ page, context }) => {
+  await openSite(page, context, { blockAd: true, reveal: false })
+  await page.clock.runFor(showDelay)
+  await page.clock.runFor(adLoadTimeout)
+  await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(0)
+  await expect(page.locator('#ab-status .ab-pred')).toHaveCount(2)
+  await page.locator('#share-btn').click()
+})
+
+test('dismiss still leaves predictions usable', async ({ page, context }) => {
   await openSite(page, context)
-  await page.locator('#gc-sponsor-link').evaluate(link => link.addEventListener('click', event => event.preventDefault()))
-  await page.locator('#gc-sponsor-link').click()
+  await page.locator('#gc-sponsor-dismiss').click()
   await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
   await page.locator('[data-pct="p90"]').click()
   await expect(page.locator('#ab-status .ab-pred')).toHaveCount(2)
@@ -191,14 +245,15 @@ for (const width of [375, 1440]) {
       await page.evaluate(locale => GCI18n.setLocale(locale), locale)
       await expect(page.locator('#gc-sponsor-slot')).toBeVisible()
       const labels = await page.evaluate(() => ({
-        open: GCI18n.text('sponsor.open'),
         privacy: GCI18n.text('sponsor.privacy'),
         frequency: GCI18n.text('sponsor.frequency'),
         label: GCI18n.text('sponsor.label')
       }))
       expect(labels.frequency).not.toMatch(/24/)
       expect(labels.frequency).toMatch(/3/)
-      await expect(page.locator('#gc-sponsor-link')).toHaveText(labels.open)
+      expect(labels.privacy).toMatch(/IP/)
+      await expect(page.locator('#gc-sponsor-link')).toHaveCount(0)
+      await expect(page.locator('#gc-sponsor-ad script')).toHaveCount(1)
       await expect(page.locator('#gc-sponsor-slot')).toContainText(labels.privacy)
       await expect(page.locator('#gc-sponsor-slot')).toContainText(labels.frequency)
       await expect(page.locator('.sponsor-label')).toHaveText(labels.label)
@@ -274,7 +329,9 @@ for (const width of [375, 1440]) {
     expect(metrics.bannerLeft).toBeLessThanOrEqual(1)
     expect(metrics.bannerWidth).toBeGreaterThanOrEqual(metrics.innerWidth - 1)
     expect(Math.abs(metrics.bannerBottom - metrics.innerHeight)).toBeLessThanOrEqual(1)
-    expect(metrics.bannerTop).toBeGreaterThan(metrics.innerHeight * 0.45)
+    expect(metrics.bannerTop).toBeGreaterThan(metrics.innerHeight * 0.55)
+    const expectedAdHeight = width >= 768 ? 90 : 50
+    expect(metrics.bannerHeight).toBeGreaterThanOrEqual(expectedAdHeight)
     expect(metrics.reserve).toBeGreaterThanOrEqual(metrics.bannerHeight - 1)
     expect(Math.abs(metrics.workspaceBottom - metrics.bannerTop)).toBeLessThanOrEqual(2)
     expect(metrics.scrolled).toBe(true)
@@ -296,7 +353,9 @@ test('online sponsor is fingerprinted and optional; offline artifact has no load
   expect(worker).not.toContain('sponsor.')
   for (const path of ['../index.html', '../dist/EB1A.html']) {
     const offline = readFileSync(resolve(__dirname, path), 'utf8')
-    const forbidden = offline.match(/effectivecpmnetwork|id=["']gc-sponsor-slot["']|sponsor\.[a-f0-9]{16}\.js|gc_sponsor_last_shown/g)
+    expect(worker).toContain('origin !== self.location.origin')
+    expect(worker).not.toContain('bauval.org')
+    const forbidden = offline.match(/effectivecpmnetwork|bauval\.org|6d1946abad3d3fdcc79373556a137876|d450c9cf5ef416c8ffc1907634e0d6e6|id=["']gc-sponsor-slot["']|sponsor\.[a-f0-9]{16}\.js|gc_sponsor_last_shown/g)
     expect(forbidden, path + ' must not include an ad destination, slot or loader').toBeNull()
   }
 })

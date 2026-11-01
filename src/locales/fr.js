@@ -1,9 +1,6 @@
 export default {
   'sponsor.label': "Publicité · Soutien facultatif",
-  'sponsor.title': "Soutenez la maintenance de GC Time",
-  'sponsor.description': "Toutes les fonctions de prévision restent disponibles sans ouvrir de publicité.",
-  'sponsor.privacy': "En ouvrant le lien, l’annonceur recevra des données de connexion, comme votre adresse IP et des informations sur le navigateur, et pourra utiliser des cookies. GC Time ne transmet pas les critères que vous avez saisis.",
-  'sponsor.open': "Ouvrir le lien sponsorisé (nouvel onglet)",
+  'sponsor.privacy': "L’annonce du bandeau est diffusée par un réseau publicitaire. Ce réseau peut recevoir des données de connexion, comme votre adresse IP et des informations sur le navigateur, et peut utiliser des cookies. GC Time ne transmet pas les critères que vous avez saisis.",
   'sponsor.dismiss': "Masquer pour le moment",
   'sponsor.frequency': "Vous pouvez le fermer à tout moment. Une fois fermé, il reste masqué environ 3 minutes, puis réapparaît à chaque visite.",
   'app.title': '{scope} · Prévision de carte verte',
