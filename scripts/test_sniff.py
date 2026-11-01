@@ -295,13 +295,22 @@ _m = _re.search(r"cron:\s*'[\d,]+ [\d-]+ (\d+)-(\d+) \* \*'", open(_wf, encoding
 check("cron 加密档期与 CORE_DAY_LO/HI 一致",
       (int(_m.group(1)), int(_m.group(2))) if _m else None,
       (S.CORE_DAY_LO, S.CORE_DAY_HI))
-# 历史实测发布日必须全部落在密探窗内,否则命中当天会被稀疏探测拖慢数小时
+# 历史实测发布日必须全部落在密探窗内,否则命中当天会被稀疏探测拖慢数小时。
+# 只约束本系统观测到的发布日;律所快讯推断的日期(inferred)不参与断言,但落在窗外必须打出来——
+# 2026-10 期 9/29 才发(FY 首期、史上最晚),窗外只有每日两次的哨兵,这不能被静默吞掉。
 import json as _json  # noqa: E402
-_days = [r["day"] for r in _json.load(open(_os.path.join(
+_log = _json.load(open(_os.path.join(
     _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "release_log.json"),
-    encoding="utf-8")) if r.get("day") is not None]   # 发布日未知的补录期不是观测值，不参与
-check(f"历史发布日 {sorted(_days)} 全在密探窗 {S.CORE_DAY_LO}-{S.CORE_DAY_HI} 内",
+    encoding="utf-8"))
+_days = [r["day"] for r in _log if r.get("day") is not None
+         and r.get("release_date_source") != "inferred"]   # 发布日未知/推断的补录期不是观测值
+check(f"实测发布日 {sorted(_days)} 全在密探窗 {S.CORE_DAY_LO}-{S.CORE_DAY_HI} 内",
       all(S.CORE_DAY_LO <= d <= S.CORE_DAY_HI for d in _days), True)
+_out = [(r["bulletin"], r["day"]) for r in _log if r.get("day") is not None
+        and r.get("release_date_source") == "inferred"
+        and not (S.CORE_DAY_LO <= r["day"] <= S.CORE_DAY_HI)]
+if _out:
+    print(f"  ⚠️ 推断发布日落在密探窗外(仅哨兵覆盖，每日 2 次): {_out}")
 
 print("\n## 7. 兜底分支不得谎报「已发布」")
 # 2026-09 的真实 bug:fetch_filing_chart 改成返回 (chart, fetched_ok) 后,
