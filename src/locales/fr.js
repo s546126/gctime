@@ -5,7 +5,7 @@ export default {
   'sponsor.privacy': "En ouvrant le lien, l’annonceur recevra des données de connexion, comme votre adresse IP et des informations sur le navigateur, et pourra utiliser des cookies. GC Time ne transmet pas les critères que vous avez saisis.",
   'sponsor.open': "Ouvrir le lien sponsorisé (nouvel onglet)",
   'sponsor.dismiss': "Masquer pour le moment",
-  'sponsor.frequency': "Vous pouvez fermer cet encart à tout moment ; il s’affiche au maximum une fois par période de 24 heures dans ce navigateur et sur ce domaine.",
+  'sponsor.frequency': "Vous pouvez le fermer à tout moment. Une fois fermé, il reste masqué environ 3 minutes, puis réapparaît à chaque visite.",
   'app.title': '{scope} · Prévision de carte verte',
   'app.heading': 'Prévision {category}',
   'app.subtitle': '{country} · Simulation de Monte-Carlo',

@@ -6,7 +6,7 @@ export default {
   'sponsor.privacy': "Aprendo il link, l’inserzionista riceverà dati di connessione, come l’indirizzo IP e informazioni sul browser, e potrà usare cookie. GC Time non invia i criteri che hai inserito per la previsione.",
   'sponsor.open': "Apri il link sponsorizzato (nuova scheda)",
   'sponsor.dismiss': "Nascondi per ora",
-  'sponsor.frequency': "Puoi chiuderlo in qualsiasi momento; viene mostrato al massimo una volta ogni 24 ore in questo browser e su questo dominio.",
+  'sponsor.frequency': "Puoi chiuderlo in qualsiasi momento. Dopo la chiusura resta nascosto per circa 3 minuti e ricompare a ogni visita.",
   'app.title': 'Proiezione delle date di priorità di {scope} · Green Card',
   'app.heading': 'Proiezione delle date di {category}',
   'app.subtitle': '{country} · Simulazione Monte Carlo',
