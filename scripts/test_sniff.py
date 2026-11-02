@@ -360,6 +360,54 @@ if _ET:
 else:
     print("  ⏭ 无 zoneinfo，跳过")
 
+print("\n## 8. 跨月补探命中不得把补探当天记成发布日")
+# 2026-11 期的真实事故:10-22 首见后更新 PR 没落地,11-01 起 run() 走跨月补探
+# 重新命中,把 day=1 写进 release_log → 第 6 节「历史发布日全在密探窗内」必挂
+# → 更新 PR 永远开不出来,站点卡在 10 月号,且每班都把"今天"重记一次。
+import json as _json2  # noqa: E402
+import shutil as _shutil  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+
+_NOV = ("<h1>Visa Bulletin For November 2026</h1>"
+        + FULL.replace("1st C 01DEC23", "1st C 01JUL24"))   # 表B 与现值同(2024-07-01)，过理智门禁
+_saved = {k: getattr(S, k) for k in
+          ("probe_published", "wayback_save", "fetch_filing_chart", "INDEX", "LOG")}
+_env = os.environ.pop("GITHUB_ENV", None)
+_tmp = _tempfile.mkdtemp(prefix="eb1a-test-late-")
+try:
+    S.probe_published = lambda ty, tm: (_NOV, "adoption.state.gov 月份页直连 200", "strong")
+    S.wayback_save = lambda url: None
+    S.fetch_filing_chart = lambda ty, tm: (None, True)
+    for _late in (True, False):
+        S.INDEX = _os.path.join(_tmp, f"index-{_late}.html")
+        S.LOG = _os.path.join(_tmp, f"log-{_late}.json")
+        _shutil.copy(_saved["INDEX"], S.INDEX)
+        _rows = [r for r in _json2.load(open(_saved["LOG"], encoding="utf-8"))
+                 if r.get("bulletin") != "2026-11"]
+        _t = datetime(2026, 11, 1, 22, 41, tzinfo=_ET) if _ET else datetime(2026, 11, 1, 22, 41)
+        with contextlib.redirect_stdout(io.StringIO()):
+            _st, _ = S.probe_target(2026, 11, "2026-11", _rows,
+                                    types.SimpleNamespace(dry_run=False, force=False), _t, late=_late)
+        _rec = next((r for r in _json2.load(open(S.LOG, encoding="utf-8"))
+                     if r.get("bulletin") == "2026-11"), {})
+        _idx = open(S.INDEX, encoding="utf-8").read()
+        if _late:
+            check("补探命中 → 正常定案(hit)", _st, "hit")
+            check("  ↑ release_log 不记 day/hour/detected_et",
+                  (_rec.get("day"), _rec.get("hour"), _rec.get("detected_et")), (None, None, None))
+            check("  ↑ 来源标 late_detection", _rec.get("release_date_source"), "late_detection")
+            check("  ↑ index.html 发布日写 unknown，不写补探当天",
+                  ("var VB_RELEASED = null" in _idx, "var VB_RELEASED_SOURCE = 'unknown'" in _idx),
+                  (True, True))
+        else:
+            check("常规探测命中 → 仍按首见时刻记录 day", _rec.get("day"), 1)
+finally:
+    for k, v in _saved.items():
+        setattr(S, k, v)
+    if _env is not None:
+        os.environ["GITHUB_ENV"] = _env
+    _shutil.rmtree(_tmp, ignore_errors=True)
+
 print()
 if FAILED:
     print(f"❌ {len(FAILED)} 项失败: {FAILED}")
