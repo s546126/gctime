@@ -58,7 +58,9 @@ MIN_RECORDS_TO_TUNE = 3
 # 上界原为 17，但 release_log 里实测发布日是 13/14/14/16/20——20 号发生过，
 # 却落在肩部日里(一天只探 ET 10/13/16/19 四次)。命中当天最多要晚 3 小时才发现，
 # 与"第一时间"相悖。按实测分布把核心日拉到 20，与 cron 的加密档期同步放宽。
-CORE_DAY_LO, CORE_DAY_HI = 10, 20
+# 2026-11 期又晚了一步:10-21 13:56 ET 仍 404,10-22 13:53 ET 肩部日稀探才首见——
+# 实际发布在 21 或 22 号。再同步拉到 22。
+CORE_DAY_LO, CORE_DAY_HI = 10, 22
 SHOULDER_HOURS = (10, 13, 16, 19)   # 肩部日只在这些 ET 整点(及其 :30)探测；含上午 10 点兜住早发
 
 
@@ -937,9 +939,11 @@ def rehearse(tag_str, args):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def probe_target(ty, tm, tag, log, args, t_now):
+def probe_target(ty, tm, tag, log, args, t_now, late=False):
     """探测并处理一期公告，返回 (status, detail)。
-    直连失败(403/连接重置/超时等，凡非 404)一律转 Wayback 兜底。"""
+    直连失败(403/连接重置/超时等，凡非 404)一律转 Wayback 兜底。
+    late=True:run() 的跨月补探(公告月 == 当前月)。此时命中时刻只是"补探到的时刻",
+    距真实发布已过去至少十来天,绝不能当成发布日/时写进 release_log 或 index.html。"""
     url = bulletin_url(ty, tm)
     est_time, t, html, err = False, t_now, None, ""
 
@@ -1022,9 +1026,18 @@ def probe_target(ty, tm, tag, log, args, t_now):
     cells = parse_cells_safe(html)      # EB-2..5 等其余格子：尽力而为
 
     # 经 Wayback 命中的 hour 不进自学习窗口（快照时间是抓取时刻，非官方释出时刻）
-    rec = {"bulletin": tag, "detected_et": t.strftime("%Y-%m-%d %H:%M"),
-           "day": t.day, "hour": (None if est_time else t.hour), "weekday": t.weekday(),
-           "fad": fad, "dff": dff}
+    if late:
+        # 跨月补探命中:发布日未知。2026-11 期的真实事故——补探在 11-01 命中,
+        # 把 day=1 记进 release_log,随后「历史发布日全在密探窗内」回归校验必挂,
+        # 更新 PR 永远开不出来,站点卡在旧一期;而且每班都用"今天"重记一次。
+        # 只记数值与首见时刻(first_seen_et 仅供人工核对,不进任何发布窗学习)。
+        rec = {"bulletin": tag, "detected_et": None, "day": None, "hour": None, "weekday": None,
+               "fad": fad, "dff": dff, "release_date_source": "late_detection",
+               "first_seen_et": t.strftime("%Y-%m-%d %H:%M")}
+    else:
+        rec = {"bulletin": tag, "detected_et": t.strftime("%Y-%m-%d %H:%M"),
+               "day": t.day, "hour": (None if est_time else t.hour), "weekday": t.weekday(),
+               "fad": fad, "dff": dff}
     if est_time:
         rec["via"] = "wayback"
 
@@ -1058,14 +1071,17 @@ def probe_target(ty, tm, tag, log, args, t_now):
         save_log(log)
         print(f"[log] 已记录到 {LOG}")
         try:
-            update_index(ty, tm, fad, dff, t, est=est_time, cells=cells)
+            # 补探命中 → detected=None:页面显示「发布日未知」,而不是把补探那天渲染成发布日
+            update_index(ty, tm, fad, dff, (None if late else t), est=est_time, cells=cells)
             print("[index] 已更新 CUTOFF_DATA / HISTORY / VB_RELEASED；FILING_CHART 已自动判定(A/B 或待确认)")
             # 标题+正文写进 GITHUB_ENV；由 workflow 在"确实新建了复核 PR"时才推送一次，防刷屏。
             _emit_env("BARK_TITLE", f"EB1A · {ty}年{tm}月排期已更新")
             _emit_env("BARK_BODY",
                       f"表A(裁定) {fad}（{_movement(old_a, fad)}） ／ 表B(递交) {dff}（{_movement(old_b, dff)}）。"
                       f"\n本月递交用表：待 USCIS 确认。已自动更新上线（如有误可回滚）。"
-                      + ("\n注：官网屏蔽探测器，本期经 Wayback 快照兜底命中，发布时刻为约值。" if est_time else ""))
+                      + ("\n注：本期为跨月补探命中，发布日未知（未记录补探当天）。" if late
+                         else "\n注：官网屏蔽探测器，本期经 Wayback 快照兜底命中，发布时刻为约值。" if est_time
+                         else ""))
             return "hit", f"{tag} 命中并已写回 index.html：表A={fad} 表B={dff}（待 PR 复核）"
         except Exception as e:
             print(f"[index] 更新失败（请按真实 HTML 校准 parse/update）: {type(e).__name__}: {e}")
@@ -1121,7 +1137,7 @@ def run(args):
                 results.append(("skip", f"门控跳过：{reason}"))
                 continue
             print(f"[gate] {reason} → 探测 {tag}")
-        results.append(probe_target(ty, tm, tag, log, args, t))
+        results.append(probe_target(ty, tm, tag, log, args, t, late=((ty, tm) == cur)))
     if not results:
         return "skip", "本月与下月公告均已定案，命中即停"
     order = {"hit": 0, "pending": 1, "404": 2, "error": 3, "skip": 4}
