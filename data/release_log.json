@@ -50,11 +50,22 @@
   },
   {
     "bulletin": "2026-10",
+    "detected_et": "2026-09-29 12:00",
+    "day": 29,
+    "hour": null,
+    "weekday": 1,
+    "fad": "2023-07-01",
+    "dff": "2024-07-01",
+    "via": "manual",
+    "release_date_source": "inferred"
+  },
+  {
+    "bulletin": "2026-11",
     "detected_et": null,
     "day": null,
     "hour": null,
     "weekday": null,
-    "fad": "2023-07-01",
+    "fad": "2023-08-01",
     "dff": "2024-07-01",
     "via": "manual",
     "release_date_source": "unknown"
