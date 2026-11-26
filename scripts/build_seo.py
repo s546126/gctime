@@ -19,6 +19,7 @@ versions of itself as hreflang alternates (plus x-default = English), and so doe
 
 import html
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -124,7 +125,7 @@ h1{font-size:1.75rem;line-height:1.25;margin:.3em 0 .2em}h2{font-size:1.2rem;mar
 .cta{display:inline-block;margin:18px 0 4px;padding:12px 18px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;min-height:44px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-variant-numeric:tabular-nums}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}th{background:#eef3f0;font-size:.9rem;white-space:nowrap}
-.d{white-space:nowrap}.legend{margin:.2em 0 .8em}
+.d,.nb{white-space:nowrap}.legend{margin:.2em 0 .8em}
 @media (max-width:520px){
 th,td{padding:8px 6px;font-size:.9rem}
 table.stack,table.stack tbody{display:block;border:0;background:none}table.stack thead{display:none}
@@ -217,6 +218,11 @@ def layout(lang, title, desc, path, body, jsonld, alts, sponsor):
 """
 
 
+def heading(text):
+    """Escaped heading text where "EB-1" … "EB-5" never break at the hyphen on narrow screens."""
+    return re.sub(r"\bEB-\d\b", lambda m: f'<span class="nb">{m.group(0)}</span>', esc(text))
+
+
 def faq_block(t):
     items = [(t["q1"], t["a1"]), (t["q2"], t["a2"]), (t["q3"], t["a3"])]
     body = f"<h2>{esc(t['faq'])}</h2>" + "".join(
@@ -264,7 +270,7 @@ def build_page(lang, cat, country, monthly, sponsor):
     links = "".join(f'<li><a href="{page_path(lang, c, k)}">{esc(page_label(lang, c, k))}</a></li>'
                     for c in CATEGORIES for k in COUNTRIES if (c, k) != (cat, country))
     path = page_path(lang, cat, country)
-    body = (f"<h1>{esc(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
+    body = (f"<h1>{heading(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
             f'<p class="muted">{esc(t["latest"].format(month=month_label(last, lang)))}</p>{cards}'
             f'<a class="cta" href="/">{esc(t["cta"])}</a><p class="muted">{esc(t["cta_note"])}</p>'
             f"{table}{consult_block(t)}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
@@ -298,7 +304,7 @@ def build_hub(lang, monthly, sponsor):
                         f'<td class="d" data-label="{la}">{esc(show(a_hist.get(last), t))}</td>'
                         f'<td class="d" data-label="{lb}">{esc(show(b_hist.get(last), t))}</td>'
                         f'<td data-label="{lc}">{esc(movement(a_hist.get(prev), a_hist.get(last), t) if prev else "—")}</td></tr>')
-    body = (f"<h1>{esc(t['hub_title'])}</h1><p class=\"muted\">{esc(t['latest'].format(month=month_label(latest, lang)))}</p>"
+    body = (f"<h1>{heading(t['hub_title'])}</h1><p class=\"muted\">{esc(t['latest'].format(month=month_label(latest, lang)))}</p>"
             f"<p>{esc(t['hub_desc'])}</p><a class=\"cta\" href=\"/\">{esc(t['cta'])}</a>"
             f"<h2>{esc(t['all'])}</h2><p class=\"muted legend\">{esc(t['legend'])}</p>"
             f"<table class=\"stack\"><thead><tr><th></th><th>{la}</th><th>{lb}</th>"
