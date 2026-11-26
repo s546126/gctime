@@ -1999,18 +1999,6 @@ function median(arr) {
   var m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
-// 线性回归斜率与残差标准差（用于发布日趋势项）。x 取 0..n-1 的期序。
-function linfit(ys) {
-  var n = ys.length; if (n < 2) return null;
-  var sx = 0, sy = 0, sxx = 0, sxy = 0;
-  for (var i = 0; i < n; i++) { sx += i; sy += ys[i]; sxx += i * i; sxy += i * ys[i]; }
-  var d = n * sxx - sx * sx; if (!d) return null;
-  var slope = (n * sxy - sx * sy) / d, intercept = (sy - slope * sx) / n;
-  var ss = 0;
-  for (var j = 0; j < n; j++) { var r = ys[j] - (intercept + slope * j); ss += r * r; }
-  return { slope: slope, intercept: intercept, sd: Math.sqrt(ss / Math.max(1, n - 2)),
-           next: intercept + slope * n };
-}
 window.__selftest_median = function () {
   var cases = [
     [[19, 17, 16, 13, 16, 20], 16.5],          // 任务指定用例
@@ -2026,31 +2014,68 @@ function sortedReleases() {
   return RELEASE_HISTORY.filter(function(p) { return p[1] && p[2] !== 'unknown'; })
     .sort(function(a, b) { return pLocal(a[1]) - pLocal(b[1]); });
 }
+// 美国联邦假日：政府不发布。与 scripts/sniff_visa_bulletin.py 的 FED_HOLIDAYS 保持一致(check_project 校验)。
+var FED_HOLIDAYS = [
+  '2026-01-01', '2026-01-19', '2026-02-16', '2026-05-25', '2026-06-19',
+  '2026-07-03', '2026-09-07', '2026-10-12', '2026-11-11', '2026-11-26', '2026-12-25',
+  '2027-01-01', '2027-01-18', '2027-02-15', '2027-05-31', '2027-06-18',
+  '2027-07-05', '2027-09-06', '2027-10-11', '2027-11-11', '2027-11-25', '2027-12-24'
+]; // FED_HOLIDAYS_END
+function isBusinessDay(d) {
+  var wd = d.getDay();
+  if (wd === 0 || wd === 6) return false;
+  var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return FED_HOLIDAYS.indexOf(key) < 0;
+}
+// 顺延到下一个工作日(跳过周末与联邦假日)
+function nextBusinessDay(d) {
+  var out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  for (var k = 0; k < 10 && !isBusinessDay(out); k++) out.setDate(out.getDate() + 1);
+  return out;
+}
+// 稳健直线：Theil–Sen 斜率(两两斜率的中位数) + 残差中位数作截距。x 用真实的公告月序号，
+// 缺期不会被当成相邻月；单个离群点(如 2026-10 号 9/29 才发布)不会把中心拖走。
+function robustFit(xs, ys) {
+  var n = xs.length; if (n < 2) return null;
+  var slopes = [];
+  for (var i = 0; i < n; i++) for (var j = i + 1; j < n; j++) {
+    if (xs[j] !== xs[i]) slopes.push((ys[j] - ys[i]) / (xs[j] - xs[i]));
+  }
+  if (!slopes.length) return null;
+  var slope = median(slopes);
+  var resid0 = xs.map(function(x, k) { return ys[k] - slope * x; });
+  var intercept = median(resid0);
+  var res = xs.map(function(x, k) { return ys[k] - (intercept + slope * x); });
+  var mad = median(res.map(Math.abs));
+  return { slope: slope, intercept: intercept, sd: 1.4826 * mad,
+           at: function(x) { return intercept + slope * x; } };
+}
 function predictNextRelease() {
   var rows = sortedReleases();
-  var ds = rows.map(function(p) { return pLocal(p[1]); });
-  if (ds.length < 2) return null;
-  function dayOf(d) { return d.getDate(); }
+  if (rows.length < 2) return null;
+  function bIdx(tag) { var a = tag.split('-'); return +a[0] * 12 + (+a[1] - 1); }
 
   // 目标月必须由【公告期】推导,不能取"末条发布日的下个月"——发布日列表会因剔除
   // 来源不可靠的期而出现空洞(2026-09 即是),那样会把目标月算错一整月。
   // 下一期公告 = VB_MON+1,而它在 VB_MON 这个月发布(如 10 月号于 9 月发布)。
   var y = VB_YEAR, mi = VB_MON - 1;            // mi = 发布所在月的 0-based 索引
+  var nextIdx = VB_YEAR * 12 + VB_MON;         // 下一期公告的月序号
   function mk(day) { return new Date(y, mi, Math.max(1, Math.min(Math.round(day), 28))); }
 
-  var win = ds.slice(-12).map(dayOf);          // 近 12 期发布"日"
+  var recent = rows.slice(-12);                // 近 12 期(按发布日排序)
+  var xs = recent.map(function(p) { return bIdx(p[0]); });
+  var win = recent.map(function(p) { return pLocal(p[1]).getDate(); });   // 发布"日"
   var lo = Math.min.apply(null, win), hi = Math.max.apply(null, win);
   var med = median(win);
-  var fit = linfit(win);                       // 趋势项:线性回归外推下一期
+  var fit = robustFit(xs, win);
 
-  // 漂移检测:后半段均值 − 前半段均值。超过 2 天即认为"发布日近期后移"。
+  // 漂移检测:后半段中位 − 前半段中位。超过 2 天即认为"发布日近期后移"。用中位而非均值，避免单个离群期误报。
   var half = Math.floor(win.length / 2);
-  function mean(a) { return a.reduce(function(s, v) { return s + v; }, 0) / a.length; }
-  var drift = win.length >= 6 ? mean(win.slice(half)) - mean(win.slice(0, half)) : 0;
+  var drift = win.length >= 6 ? median(win.slice(half)) - median(win.slice(0, half)) : 0;
 
-  // 中心:有足够样本时用趋势外推,否则退回中位数。区间用残差标准差(±1σ)而非历史极值,
-  // 极值只作为"历史范围"单独呈现——20 号在 12 期里仅出现一次,是极大值不是中心。
-  var center = (fit && win.length >= 8) ? fit.next : med;
+  // 中心:样本足够时用稳健趋势外推到下一期的真实月序号,否则退回中位数。区间用残差的稳健离散度(±1σ，
+  // σ≈1.4826×MAD)而非历史极值,极值只作为"历史范围"单独呈现。
+  var center = (fit && win.length >= 8) ? fit.at(nextIdx) : med;
   var sd = fit ? Math.max(1.2, fit.sd) : 2.2;
   var bandLo = center - sd, bandHi = center + sd;
 
@@ -2061,19 +2086,16 @@ function predictNextRelease() {
                        .map(function(p) { return pLocal(p[1]).getDate(); });
   var fyHypo = (nextBulletinMonth === 10)
     ? { n: octSamples.length, days: octSamples,
-        mean: octSamples.length ? mean(octSamples) : null }
+        mean: octSamples.length ? octSamples.reduce(function(a, b) { return a + b; }, 0) / octSamples.length : null }
     : null;
 
-  var est = mk(center);
-  var wd = est.getDay();
-  if (wd === 6) est.setDate(est.getDate() - 1);        // 周六 → 周五
-  else if (wd === 0) est.setDate(est.getDate() + 1);   // 周日 → 周一
+  // 周末与联邦假日不发布:点估计、窗口起止都顺延到下一个工作日(如感恩节当天不算窗口末日)。
   return {
-    est: est, lo: mk(bandLo), hi: mk(bandHi),
+    est: nextBusinessDay(mk(center)), lo: nextBusinessDay(mk(bandLo)), hi: nextBusinessDay(mk(bandHi)),
     extLo: mk(lo), extHi: mk(hi),
     center: center, sd: sd, drift: drift, n: win.length,
     slope: fit ? fit.slope : 0, fyHypo: fyHypo,
-    spanFrom: ds[Math.max(0, ds.length - 12)], spanTo: ds[ds.length - 1]
+    spanFrom: pLocal(recent[0][1]), spanTo: pLocal(recent[recent.length - 1][1])
   };
 }
 function recentReleasesText(n) {
