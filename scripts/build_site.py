@@ -10,6 +10,7 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import build_seo
 from build_offline import ensure_ui_assets, main as build_offline
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,6 +52,7 @@ def main(skip_ui=False):
         '</body>',
         '<div id="gc-sponsor-slot" hidden></div>\n<script src="assets/sponsor.js" defer></script>\n</body>',
     )
+    published = {}
     for name in ("assets/ui.js", "assets/ui.css", *ONLINE_ASSETS.values()):
         source = site / name
         fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
@@ -59,7 +61,11 @@ def main(skip_ui=False):
         asset_url = versioned.relative_to(site).as_posix()
         html = html.replace(f'"{name}"', f'"{asset_url}"')
         worker_text = worker_text.replace(f"'./{name}'", f"'./{asset_url}'")
+        published[name] = asset_url
+    # 搜索引擎看不到 JS 渲染的内容：首页补描述与结构化数据，另生成纯 HTML 的排期页和站点地图。
+    html = build_seo.add_head(html)
     (site / "index.html").write_text(html, encoding="utf-8")
+    build_seo.build(site, sponsor_src="/" + published["assets/sponsor.js"])
     # 内容变动就更新 worker，HTML、CSS 和 JS 作为同一份快照预缓存。
     digest = hashlib.sha256()
     for name in (*ASSETS, *ONLINE_ASSETS):
