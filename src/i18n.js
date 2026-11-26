@@ -1,4 +1,5 @@
 import zhCN from './locales/zh-CN.js'
+import en from './locales/en.js'
 import hi from './locales/hi.js'
 import es from './locales/es.js'
 import ptBR from './locales/pt-BR.js'
@@ -10,9 +11,10 @@ import ar from './locales/ar.js'
 import it from './locales/it.js'
 
 // 词典随 ui.js 静态打包；新增语言必须先通过完整性校验，再加入 catalogs。
-export const catalogs = { 'zh-CN': zhCN, hi, es, 'pt-BR': ptBR, ja, ko, ar, de, fr, it }
+export const catalogs = { 'zh-CN': zhCN, en, hi, es, 'pt-BR': ptBR, ja, ko, ar, de, fr, it }
 export const languages = [
   { id: 'zh-CN', name: '中文', locale: 'zh-CN' },
+  { id: 'en', name: 'English', locale: 'en-US' },
   { id: 'hi', name: 'हिन्दी', locale: 'hi-IN' },
   { id: 'es', name: 'Español', locale: 'es' },
   { id: 'pt-BR', name: 'Português', locale: 'pt-BR' },
@@ -29,7 +31,8 @@ const listeners = new Set()
 const formatters = new Map()
 const owns = (object, key) => Object.prototype.hasOwnProperty.call(object, key)
 const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
-let currentLocale = 'zh-CN'
+// 没有任何受支持的浏览器语言时回退英文；中文浏览器仍按偏好匹配 zh-CN。
+let currentLocale = 'en'
 
 function placeholders(message) {
   return [...new Set([...message.matchAll(/\{([A-Za-z][A-Za-z0-9]*)\}/g)].map(match => match[1]))].sort().join(',')
@@ -177,7 +180,7 @@ if (isBrowser) {
       selected = preferences.map(normalizeLocale).find(Boolean)
     } catch {}
   }
-  setLocale(selected || 'zh-CN', { persist: false, notify: false })
+  setLocale(selected || 'en', { persist: false, notify: false })
   window.GCI18n = {
     t, text, getLocale, setLocale, subscribe, availableLanguages, normalizeLocale,
     formatNumber, formatDate, formatMonth, formatUnit, formatDuration, formatRelative,

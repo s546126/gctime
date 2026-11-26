@@ -3,7 +3,7 @@ const { resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
 
 const profileKey = 'eb1a_user_profile'
-const locales = ['zh-CN', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
+const locales = ['zh-CN', 'en', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
 const savedProfile = {
   pd: Date.UTC(2026, 0, 15), category: 'EB-1A', country: 'CN', path: 'AOS', family: 0, chartType: 'A'
 }
@@ -134,7 +134,7 @@ for (const country of ['CN', 'IN', 'ROW']) {
   })
 }
 
-test('all ten languages show a single EB-1 talent definition without subtype names', async ({ page }) => {
+test('all eleven languages show a single EB-1 talent definition without subtype names', async ({ page }) => {
   const { catalogs } = await import(pathToFileURL(resolve('src/i18n.js')).href)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await seedProfile(page, 'IN')
