@@ -235,11 +235,11 @@ test('sponsor is removed if the connection goes offline', async ({ page, context
 })
 
 for (const width of [375, 1440]) {
-  test(`ten languages and RTL fit ${width}px without changing predictions`, async ({ page, context }, testInfo) => {
+  test(`eleven languages and RTL fit ${width}px without changing predictions`, async ({ page, context }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
     await openSite(page, context)
     const languages = await page.evaluate(() => GCI18n.availableLanguages().map(item => item.id))
-    expect(languages).toHaveLength(10)
+    expect(languages).toHaveLength(11)
     const rng = await page.evaluate(() => _rngState)
     for (const locale of languages) {
       await page.evaluate(locale => GCI18n.setLocale(locale), locale)

@@ -2,7 +2,7 @@ const { test: base, expect } = require('@playwright/test')
 const { resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
 
-const locales = ['zh-CN', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
+const locales = ['zh-CN', 'en', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
 const profile = {
   pd: Date.UTC(2026, 0, 15), category: 'EB-1A', country: 'CN', path: 'AOS', family: 0, chartType: 'A'
 }
@@ -49,11 +49,11 @@ async function expectLocale(page, locale) {
 }
 
 for (const [region, locale] of [
-  ['zh-TW', 'zh-CN'], ['hi-IN', 'hi'], ['es-MX', 'es'], ['pt-PT', 'pt-BR'], ['ja-JP', 'ja'],
+  ['zh-TW', 'zh-CN'], ['en-US', 'en'], ['en-GB', 'en'], ['en-IN', 'en'], ['hi-IN', 'hi'], ['es-MX', 'es'], ['pt-PT', 'pt-BR'], ['ja-JP', 'ja'],
   ['ko-KR', 'ko'], ['ar-EG', 'ar'], ['de-AT', 'de'], ['fr-CA', 'fr'], ['it-CH', 'it']
 ]) {
   test(`first visit maps browser ${region} to ${locale} without saving an automatic preference`, async ({ page }) => {
-    await preferences(page, { languages: [region, 'en-US'], language: 'en-US' })
+    await preferences(page, { languages: [region, 'nl-NL'], language: 'nl-NL' })
     await page.goto('./')
     await expectLocale(page, locale)
     await expect(page.locator('#welcome-modal')).toBeVisible()
@@ -63,7 +63,7 @@ for (const [region, locale] of [
 }
 
 test('browser preferences skip unsupported languages and use the first supported language before navigator.language', async ({ page }) => {
-  await preferences(page, { languages: ['en-US', 'fr-CA', 'ja-JP'], language: 'es-MX' })
+  await preferences(page, { languages: ['nl-NL', 'fr-CA', 'ja-JP'], language: 'es-MX' })
   await page.goto('./')
   await expectLocale(page, 'fr')
   expect(await page.evaluate(() => localStorage.getItem('gc_language'))).toBeNull()
@@ -75,15 +75,28 @@ test('empty browser preference list falls back to navigator.language', async ({ 
   await expectLocale(page, 'de')
 })
 
-test('unsupported browser preferences and navigator.language fall back to Chinese', async ({ page }) => {
-  await preferences(page, { languages: ['en-US', 'nl-NL'], language: 'sv-SE' })
+test('unsupported browser preferences and navigator.language fall back to English', async ({ page }) => {
+  await preferences(page, { languages: ['nl-NL', 'pl-PL'], language: 'sv-SE' })
+  await page.goto('./')
+  await expectLocale(page, 'en')
+  expect(await page.evaluate(() => localStorage.getItem('gc_language'))).toBeNull()
+})
+
+test('a Chinese browser that also lists English keeps Chinese first', async ({ page }) => {
+  await preferences(page, { languages: ['zh-CN', 'en-US'], language: 'zh-CN' })
   await page.goto('./')
   await expectLocale(page, 'zh-CN')
   expect(await page.evaluate(() => localStorage.getItem('gc_language'))).toBeNull()
 })
 
+test('an English browser that also lists Chinese keeps English first', async ({ page }) => {
+  await preferences(page, { languages: ['en-US', 'zh-CN'], language: 'en-US' })
+  await page.goto('./')
+  await expectLocale(page, 'en')
+})
+
 test('invalid stored and shared languages fall through to the supported browser language', async ({ page }) => {
-  await preferences(page, { languages: ['es-MX'], language: 'en-US', saved: 'not-a-language' })
+  await preferences(page, { languages: ['es-MX'], language: 'nl-NL', saved: 'not-a-language' })
   await page.goto('./#lang=unsupported')
   await expectLocale(page, 'es')
   expect(await page.evaluate(() => localStorage.getItem('gc_language'))).toBe('not-a-language')
@@ -126,7 +139,7 @@ test('a valid shared language wins over saved and browser languages without over
 })
 
 test('blocked localStorage still allows browser initialization and a manual language change', async ({ page }) => {
-  await preferences(page, { languages: ['hi-IN'], language: 'en-US', blocked: true })
+  await preferences(page, { languages: ['hi-IN'], language: 'nl-NL', blocked: true })
   await page.goto('./')
   await expectLocale(page, 'hi')
   await expect(page.locator('#welcome-modal')).toBeVisible()
@@ -134,10 +147,10 @@ test('blocked localStorage still allows browser initialization and a manual lang
   await expectLocale(page, 'ko')
 })
 
-test('offline single HTML follows the browser and keeps exactly ten language options with no network requests', async ({ page, context }) => {
+test('offline single HTML follows the browser and keeps exactly eleven language options with no network requests', async ({ page, context }) => {
   const requests = []
   page.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()) })
-  await preferences(page, { languages: ['en-US', 'pt-PT'], language: 'en-US', savedProfile: true })
+  await preferences(page, { languages: ['nl-NL', 'pt-PT'], language: 'nl-NL', savedProfile: true })
   await context.setOffline(true)
   await page.goto(pathToFileURL(resolve('dist/EB1A.html')).href)
   await expectLocale(page, 'pt-BR')
