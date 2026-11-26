@@ -226,6 +226,10 @@ OLD6 = ("Final Action Dates for Employment-Based Preference Cases "
 c6 = S.parse_eb_cells(OLD6)
 check("6 列版式：丢掉 ESGH 后列不串位（印度 EB-2 = Unavailable）", c6[("EB-2", "IN")], ("unavailable", "unavailable"))
 check("6 列版式：中国 EB-3", c6[("EB-3", "CN")], ("2022-01-01", "2022-06-01"))
+# 2026-11 实例：表B 末行之后紧跟 "B.&nbsp; U.S. GOVERNMENT ..."，"U." 不能被读成第 6 个值(否则丢列错位)
+check("末行后的 'U.S.' 不算 Unavailable",
+      S._row_tokens(" C C C C C B.&nbsp;&nbsp; U.S. GOVERNMENT EMPLOYEE SPECIAL IMMIGRANT VISAS"),
+      ["current"] * 5)
 # 失败模式：多类别解析失败必须只告警、返回 None，不能抛（否则会拖垮 EB-1A 中国更新）
 buf2 = io.StringIO()
 with contextlib.redirect_stdout(buf2):
@@ -380,7 +384,7 @@ import tempfile as _tempfile  # noqa: E402
 _NOV = ("<h1>Visa Bulletin For November 2026</h1>"
         + FULL.replace("1st C 01DEC23", "1st C 01JUL24"))   # 表B 与现值同(2024-07-01)，过理智门禁
 _saved = {k: getattr(S, k) for k in
-          ("probe_published", "wayback_save", "fetch_filing_chart", "INDEX", "LOG")}
+          ("probe_published", "wayback_save", "fetch_filing_chart", "INDEX", "LOG", "HIST_JSON")}
 _env = os.environ.pop("GITHUB_ENV", None)
 _tmp = _tempfile.mkdtemp(prefix="eb1a-test-late-")
 try:
@@ -390,7 +394,9 @@ try:
     for _late in (True, False):
         S.INDEX = _os.path.join(_tmp, f"index-{_late}.html")
         S.LOG = _os.path.join(_tmp, f"log-{_late}.json")
+        S.HIST_JSON = _os.path.join(_tmp, f"hist-{_late}.json")
         _shutil.copy(_saved["INDEX"], S.INDEX)
+        _shutil.copy(_saved["HIST_JSON"], S.HIST_JSON)
         _rows = [r for r in _json2.load(open(_saved["LOG"], encoding="utf-8"))
                  if r.get("bulletin") != "2026-11"]
         _t = datetime(2026, 11, 1, 22, 41, tzinfo=_ET) if _ET else datetime(2026, 11, 1, 22, 41)
@@ -410,6 +416,10 @@ try:
                   (True, True))
         else:
             check("常规探测命中 → 仍按首见时刻记录 day", _rec.get("day"), 1)
+            _hj = _json2.load(open(S.HIST_JSON, encoding="utf-8"))
+            check("  ↑ visa_bulletin_history.json 同步写入本期(last_bulletin + 各格)",
+                  (_hj["last_bulletin"] >= "2026-11", _hj["monthly"]["EB-1A|CN|B"].get("2026-11"),
+                   _hj["monthly"]["EB-2|CN|A"].get("2026-11") is not None), (True, "2024-07-01", True))
 finally:
     for k, v in _saved.items():
         setattr(S, k, v)

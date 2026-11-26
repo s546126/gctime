@@ -36,9 +36,10 @@
 
 1. vyakunin/visa_bulletin `visa_bulletin.db`（2001-12 ~ 2025-12，解析自 DOS HTML 存档）
 2. yuchenlin/pd-tracker `src/data/visa-bulletins.json`（2021-09 ~ 2026-10，含 2026 年 1–10 月与 2026-10 期）
+3. 2026-11 起由探测器 `scripts/sniff_visa_bulletin.py` 从 DOS 官方公告页逐期追加（`update_history_json`）。2026-11 期 40 个格子取自 travel.state.gov 官方 HTML（真实浏览器访问），表 A/B 全部 EB-1..EB-5 及三个 EB-5 预留类。
 
 二者在 2021-09~2025-12 的 2,520 个重叠格子逐格一致。2026-10 期抽查（律所摘要，经 WebSearch）：EB-2 中国 A 2021-10-01、印度 A 2013-11-01；EB-5 中国 A 2016-12-01 / B 2021-03-01，印度 A 2023-12-01 / B 2024-05-01；三个 EB-5 预留类 Current；EB-3 中国 B 2024-04-01 —— 均吻合。**仍非一手来源，请以官方公告为准。**
-未收录：EW、EB-4 宗教工作者、ESGH 列（2023-03 后取消）。EB-5 预留类的 2026 年月份来自律所摘要。已发现的既有数据差异：index.html `HISTORY` 里 2026-03 EB-1A 中国表A 为 2023-03-15，转录与律所均为 2023-03-01（未改动以保持 EB-1A 输出不变）。
+未收录：EW、EB-4 宗教工作者、ESGH 列（2023-03 后取消）。EB-5 预留类的 2026 年月份来自律所摘要。EB-1A 中国原先另存于 index.html 手写的 `HISTORY`/`HISTORY_B`，与本 JSON 有 6 个月不一致（表A 2026-03；表B 2024-10、2025-07、2025-12、2026-01、2026-03）。已逐期对照官方公告：6 处均为 JSON 正确，现 EB-1A 中国与其他格子一样只从本 JSON 生成（HIST_DATA），`scripts/check_project.py` 校验两者逐月一致。
 
 标定用 USCIS 数据：`data/raw/uscis/I140_I360_I526_Approved_FY2026_Q1.xlsx`（as of 2025-12，按国别×类别的已批准 I-140 待签主申）与 `I485_Pending_Inventory_april_2026.xlsx`，见 `scripts/calibrate_categories.py`。
 

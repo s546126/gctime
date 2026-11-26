@@ -38,6 +38,7 @@ except Exception:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INDEX = os.path.join(ROOT, "index.html")
 LOG = os.path.join(ROOT, "data", "release_log.json")
+HIST_JSON = os.path.join(ROOT, "data", "visa_bulletin_history.json")
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 MONTHS = ["january", "february", "march", "april", "may", "june",
           "july", "august", "september", "october", "november", "december"]
@@ -352,7 +353,9 @@ def _row_tokens(seg):
     """一行文本 → 值列表：'YYYY-MM-DD' / 'current' / 'unavailable'。先去掉括号里的说明(如 (including C5, T5, ...))。"""
     seg = re.sub(r"\([^)]*\)", " ", seg)
     vals = []
-    for d, mo, yy, flag in re.findall(r"(\d{2})\s*([A-Za-z]{3})\s*(\d{2})|\b([CcUu])\b", seg):
+    # C/U 后不能紧跟 "." 或字母数字：末行之后常是 "B.&nbsp; U.S. GOVERNMENT ..."，
+    # 旧正则把 "U." 当成第 6 个值，触发 ESGH 丢列，整行错位(2026-11 Infra 行 PH 被读成 U)。
+    for d, mo, yy, flag in re.findall(r"(\d{2})\s*([A-Za-z]{3})\s*(\d{2})|\b([CcUu])\b(?![.\w])", seg):
         if flag:
             vals.append("current" if flag.upper() == "C" else "unavailable")
         else:
@@ -494,6 +497,38 @@ def apply_cells_to_index(s, cells, bull):
                    lambda m: "/*HIST_DATA_BEGIN*/" + body + "/*HIST_DATA_END*/", s, count=1, flags=re.S)
     print(f"[cells] 已写入 {n_upd} 个格子的 CUTOFF_DATA / HIST_DATA（{bull}）")
     return s
+
+
+def update_history_json(tag, cells=None, eb1cn=None, path=None):
+    """把本期写进 data/visa_bulletin_history.json(各序列的月度单一来源)，并推进 last_bulletin。
+    cells 同 apply_cells_to_index；eb1cn=(表A, 表B) 是 EB-1A 中国(人工录入只有这一格)。
+    只录入了部分格子时，其余序列不会到达 tag——check_project 会据此报错，提示补齐整期公告。"""
+    path = path or HIST_JSON
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    monthly = doc["monthly"]
+
+    def conv(v):
+        return "C" if v == "current" else ("U" if v == "unavailable" else v)
+
+    def put(cat, co, a, b):
+        for t, v in (("A", a), ("B", b)):
+            monthly.setdefault(f"{cat}|{co}|{t}", {})[tag] = conv(v)
+
+    n = 0
+    for (cat, co), (a, b) in (cells or {}).items():
+        if _valid_cell_value(a) and _valid_cell_value(b):
+            put(cat, co, a, b)
+            n += 1
+    if eb1cn and all(_valid_cell_value(v) for v in eb1cn):
+        put("EB-1A", "CN", *eb1cn)
+        n += 1
+    if n and tag > doc.get("last_bulletin", ""):
+        doc["last_bulletin"] = tag
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=0, separators=(",", ":"))
+    print(f"[history] visa_bulletin_history.json 写入 {n} 格（{tag}），last_bulletin={doc['last_bulletin']}")
+    return doc
 
 
 # ---- A1: 写入前的理智门禁（防止解析错误把垃圾日期写进 index.html）----
@@ -896,15 +931,17 @@ def rehearse(tag_str, args):
     ty, tm = int(m.group(1)), int(m.group(2))
     tag = f"{ty}-{tm:02d}"
 
-    global INDEX, LOG
-    orig_index, orig_log = INDEX, LOG
+    global INDEX, LOG, HIST_JSON
+    orig_index, orig_log, orig_hist = INDEX, LOG, HIST_JSON
     # 彩排绝不能把 BARK_* 漏进 $GITHUB_ENV——否则后续步骤可能拿它去发通知。
     saved_env = os.environ.pop("GITHUB_ENV", None)
     tmp = tempfile.mkdtemp(prefix="eb1a-rehearse-")
     try:
         INDEX = os.path.join(tmp, "index.html")
         LOG = os.path.join(tmp, "release_log.json")
+        HIST_JSON = os.path.join(tmp, "visa_bulletin_history.json")
         shutil.copy(orig_index, INDEX)
+        shutil.copy(orig_hist, HIST_JSON)
         before = open(INDEX, encoding="utf-8").read()
         # 从副本 log 里摘掉目标期,让它被当成"尚未抓到"
         rows = [r for r in json.load(open(orig_log, encoding="utf-8"))
@@ -933,7 +970,7 @@ def rehearse(tag_str, args):
             f"彩排 {tag}: probe={status}, index.html 改 {len(changed)} 行, "
             f"log 记录 {'有' if newrec else '无'} → {'✅ 整条链路跑通' if ok else '❌ 未跑通,见上'}")
     finally:
-        INDEX, LOG = orig_index, orig_log
+        INDEX, LOG, HIST_JSON = orig_index, orig_log, orig_hist
         if saved_env is not None:
             os.environ["GITHUB_ENV"] = saved_env
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1321,6 +1358,11 @@ def update_index(ty, tm, fad, dff, detected, est=False, chart_override=None, man
 
     with open(INDEX, "w", encoding="utf-8") as f:
         f.write(s)
+    # 4) 月度单一来源 data/visa_bulletin_history.json：同期写入(失败不影响 index.html 已写的更新)
+    try:
+        update_history_json(f"{ty}-{tm:02d}", cells=cells, eb1cn=(fad, dff))
+    except Exception as e:
+        print(f"[history] ⚠️ visa_bulletin_history.json 写入失败：{type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
