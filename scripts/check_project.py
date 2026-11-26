@@ -191,13 +191,35 @@ def check_bulletin_data():
                     raise SystemExit(f"CUTOFF_DATA {key}={v} 与 JSON {last} 期 {monthly[key].get(last)} 不一致")
 
 
+def check_analytics():
+    """匿名统计只进在线产物，并且只在正式域名的 HTTPS 页面加载 PostHog。"""
+    source = (ROOT / "src" / "analytics.js").read_text(encoding="utf-8")
+    for host in PRODUCTION_HOSTS:
+        if f"'{host}'" not in source:
+            raise SystemExit(f"统计宿主缺失：{host}")
+    for snippet in (
+        "location.protocol === 'https:'", "person_profiles: 'identified_only'", "autocapture: false",
+        "disable_session_recording: true", "respect_dnt: true", "capture_pageview: true",
+        "capture_pageleave: true", "before_send", "register({ app: APP })", "__GC_ANALYTICS_MOCK",
+    ):
+        if snippet not in source:
+            raise SystemExit(f"统计脚本缺少约束：{snippet}")
+    page_source = (ROOT / "index.html").read_text(encoding="utf-8")
+    for forbidden in ("posthog.com", "phc_", "array.js", "assets/analytics"):
+        if forbidden in page_source:
+            raise SystemExit(f"源页面和离线页不能包含统计加载器：{forbidden}")
+    build = (ROOT / "scripts" / "build_site.py").read_text(encoding="utf-8")
+    if '"src/analytics.js": "assets/analytics.js"' not in build:
+        raise SystemExit("在线构建必须单独复制统计脚本")
+
+
 def main(source_only=False):
     for path in sorted((ROOT / "scripts").glob("*.py")):
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for path in sorted((ROOT / "scripts").glob("*.sh")):
         subprocess.run(["bash", "-n", str(path)], check=True)
     for path in [*sorted((ROOT / "scripts").glob("*.mjs")), *sorted(ROOT.glob("*.js")),
-                 ROOT / "src" / "sponsor.js", *sorted((ROOT / "functions").rglob("*.js"))]:
+                 ROOT / "src" / "sponsor.js", ROOT / "src" / "analytics.js", *sorted((ROOT / "functions").rglob("*.js"))]:
         subprocess.run(["node", "--check", str(path)], check=True)
     subprocess.run(["node", str(ROOT / "scripts" / "build_ui.mjs"), "--check"], cwd=ROOT, check=True)
     for path in [ROOT / "manifest.json", *sorted((ROOT / "data").glob("*.json"))]:
@@ -218,6 +240,7 @@ def main(source_only=False):
     if not source_only:
         subprocess.run(["node", "--check", str(ROOT / "assets" / "ui.js")], check=True)
     check_sponsor()
+    check_analytics()
     check_bulletin_data()
     print("✓ Python / Shell / JavaScript 语法、JSON 和页面资源检查通过")
 

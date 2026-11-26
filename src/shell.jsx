@@ -6,11 +6,18 @@ import { Button } from '@heroui/react/button'
 import './share.js'
 import { availableLanguages, getLocale, setLocale, subscribe, text } from './i18n.js'
 
+// 切换语言后发匿名统计 locale_changed（仅在线版有 GCAnalytics；离线为空操作）。
+function changeLocale(next) {
+  const from = getLocale()
+  if (!setLocale(next) || from === getLocale()) return
+  try { window.GCAnalytics?.capture('locale_changed', { from, to: getLocale() }) } catch {}
+}
+
 function LanguageSelect({ id }) {
   const locale = useSyncExternalStore(subscribe, getLocale)
   return <label className="language-picker">
     <span>{text('language.label')}</span>
-    <select id={id} value={locale} onChange={event => setLocale(event.target.value)} aria-label={text('language.label')}>
+    <select id={id} value={locale} onChange={event => changeLocale(event.target.value)} aria-label={text('language.label')}>
       {availableLanguages().map(language => <option key={language.id} value={language.id} lang={language.id}>{language.name}</option>)}
     </select>
   </label>
@@ -55,7 +62,7 @@ function ConsultLink() {
   const href = base + (locale === 'zh-CN' ? 'zh/consult/' : 'consult/?lang=' + encodeURIComponent(locale))
   return <p className="consult-cta" id="consult-cta">
     <span>{text('consult.title')}</span>
-    <a href={href}>{text('consult.link')}</a>
+    <a href={href} data-gc-cta="app">{text('consult.link')}</a>
   </p>
 }
 

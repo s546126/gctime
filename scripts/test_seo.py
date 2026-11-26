@@ -93,7 +93,8 @@ def main():
     check_text()
     with tempfile.TemporaryDirectory() as tmp:
         site = Path(tmp)
-        paths = build_seo.build(site, sponsor_src="/assets/sponsor.test.js", catalogs=CATALOGS)
+        paths = build_seo.build(site, sponsor_src="/assets/sponsor.test.js", catalogs=CATALOGS,
+                               analytics_src="/assets/analytics.test.js")
         assert len(paths) == len(set(paths)), "重复路径"
         expected = expected_paths()
         # 原有 URL 保持不变。
@@ -138,7 +139,12 @@ def main():
             # 语言切换器列出同一页面的每个语言版本。
             for target in alts.values():
                 assert f'<a href="{target}"' in text, (path, target)
+            # 匿名统计在所有静态页（含评估页）加载，挂在 <head> 里。
+            assert text.count('<script src="/assets/analytics.test.js" defer></script>') == 1, path
+            assert text.index("analytics.test.js") < text.index("</head>"), path
             if path in CONSULT:
+                assert "lead_submit_result" in text and "PostHog" in text, path
+                assert "no ads or tracking scripts" not in text and "没有广告或追踪脚本" not in text, path
                 # 收集联系方式的页面不加载第三方广告脚本。
                 assert 'id="gc-sponsor-slot"' not in text and "sponsor.test.js" not in text, path
                 continue
@@ -146,6 +152,8 @@ def main():
             assert f'"sponsor.label": "AD-{code}"' in text, (path, "sponsor 文案应来自本语言词典")
             consult = "/zh/consult/" if code == "zh" else "/consult/"
             assert '<section class="consult-cta">' in text and f'href="{consult}"' in text, path
+            placement = "hub" if path == t["hub_path"] else "landing"
+            assert f'href="{consult}" data-gc-cta="{placement}"' in text, path
             assert "app.brand" not in text, "只应带 sponsor.* 文案"
             # 窄屏表格：短表头 + 说明 + 日期不换行。
             assert f"<th>{t['chart_a_short']}</th>" in text.replace("&#x27;", "'") and 'class="muted legend"' in text, path
@@ -173,6 +181,7 @@ def main():
         empty = Path(tmp) / "plain"
         build_seo.build(empty)
         assert 'id="gc-sponsor-slot"' not in (empty / "visa-bulletin" / "index.html").read_text(encoding="utf-8")
+        assert "analytics" not in (empty / "consult" / "index.html").read_text(encoding="utf-8").split("<main>")[0]
     head = build_seo.add_head("<html><head></head><body></body></html>")
     assert head.count('rel="canonical"') == 1 and "/visa-bulletin/eb-1-india/" in head and "/ar/visa-bulletin/" in head
     print(f"✅ SEO 页面检查通过（{len(paths)} 个 URL，{len(LANGS)} 种语言）")

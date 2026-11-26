@@ -38,12 +38,43 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 
 广告平台对新站点内容／实际域名的批准、投放可用性及收入须由账户所有者在 Adsterra 后台核验；代码上线不等于已获平台批准。测试只使用拦截的广告目标，不点击真实广告。域名切换及回滚见 [运维说明](docs/domain-migration.md)。不同域名的浏览器存储相互独立；不强制跳转或清除档案，可用现有分享链接在地址之间转移条件。
 
+## 匿名使用统计（PostHog）
+
+站主批准的唯一遥测：用 PostHog 统计“落地 → 预测 → 评估入口 → 提交线索”的漏斗和广告实际展示率，用来改进页面。与 Bracket Boss 共用同一个 PostHog 项目（US 区，`https://us.i.posthog.com`）；每个事件都带 `app = gctime`，与 `$host` 一起把两个产品分开。
+
+- **只在线上加载**：`src/analytics.js` 和 `src/sponsor.js` 一样由在线构建单独复制、指纹化，注入应用页 `<head>` 和所有静态页（`/visa-bulletin/*`、`/zh/*`、`/consult/`、`/zh/consult/`）。脚本自己再判断：只有 `bracketboss2026.com`、`www.` 和 `gc.` 的 HTTPS 页面才加载 `https://us.i.posthog.com/static/array.js`；预览域名、GitHub Pages、本地和单文件离线版不发任何请求。离线 HTML 和源 `index.html` 只含可选调用 `window.GCAnalytics`，不含 PostHog 地址、token 或加载器（隐私说明文案里会出现 PostHog 这个名字）。
+- **隐私设置**：`person_profiles: 'identified_only'`（从不 identify，所以不建人物档案）、`capture_pageview` / `capture_pageleave` 开、`autocapture` / 热图 / 死点击 / 问卷关、`disable_session_recording: true`、`respect_dnt: true`；浏览器发送 Do Not Track 时连脚本都不加载。`before_send` 删除所有 URL 的 `#` 片段（分享链接在片段里带优先日）和除 `utm_*`、`lang`、`ref` 外的查询参数，并丢弃 `name` / `email` / `contact` / `phone` / `message` / `priority_date` / `pd` 等键。不发姓名、邮箱、电话、留言，也不发优先日（连年份都不发）。PostHog 仍会按其默认设置收到 IP 并做 GeoIP；如需丢弃 IP，在 PostHog 项目设置里开启 “Discard client IP data”（项目级，会同时影响 Bracket Boss）。
+- **失败无害**：被拦截、加载失败或 PostHog 不可用时只是没有统计，预测、表单和横幅照常。Service Worker 对跨源请求直接放过，不拦截也不缓存 PostHog 请求；统计脚本不是 worker 预缓存依赖。
+- **测试接缝**：页面加载前设置 `window.__GC_ANALYTICS_MOCK = []` 时，事件只写进这个数组，不加载任何脚本、不发请求（`tests/analytics.spec.js`、`tests/sponsor.spec.js` 使用）。
+
+事件（名称 snake_case，都带 `app = gctime`）：
+
+| 事件 | 何时 | 属性 |
+|---|---|---|
+| `$pageview` / `$pageleave` | 每个页面（PostHog 自动） | PostHog 默认属性，URL 已去掉片段 |
+| `predict_run` | 用户主动计算或改条件后去抖 1 秒（开始预测、更新预测、情景、供给、速度、参数滑杆、重置、推演）；页面加载本身不算 | `trigger`、`category`、`country`（出生国）、`chart`（USCIS 本期递交用表 A/B/unknown）、`scenario`（optimistic/median/conservative）、`supply`、`pace`、`result_bucket`（按递交用表、取整的距 current 年数，已到期为 0，无法估算为 null）、`result_bucket_a`、`result_bucket_b`、`shared`、`locale` |
+| `share_link_created` | 点「分享链接」 | `category`、`country`、`locale` |
+| `locale_changed` | 页首或首访弹窗切换语言 | `from`、`to` |
+| `consult_cta_click` | 点免费评估入口（sendBeacon，先补发待发的 `predict_run`） | `placement`（app / landing / hub）、`page`、`locale` |
+| `consult_view` | 打开 `/consult/` 或 `/zh/consult/` | `page`、`locale`、`source`（同站来源路径） |
+| `lead_submit_result` | 表单提交返回 | `result`（ok / error）、`code`（ok 或服务端错误码 / offline）、`category`、`country`、`locale` |
+| `sponsor_shown` | 底部横幅出现 | `unit`（desktop / mobile） |
+| `sponsor_ad_loaded` | 广告 iframe 出现（每页一次） | `unit` |
+| `sponsor_hidden` | 横幅因故收起 | `reason`（timeout / error / offline）、`unit` |
+| `sponsor_dismissed` | 用户点「关闭」 | `unit`、`ad_loaded` |
+
+在 PostHog 里查看：项目与 Bracket Boss 相同，所有 Insight 加过滤 `app = gctime`。不要用 `$host` 区分：Bracket Boss 也曾部署在 `bracketboss2026.com`，同一主机名下的旧事件属于它。建议的 Insight：
+
+1. **漏斗**：`$pageview` → `predict_run` → `consult_cta_click` → `lead_submit_result`（过滤 `result = ok`），按 `placement` 或首个 `$pathname` 拆分。只看过而没再操作的老用户不会产生 `predict_run`，漏斗第二步因此偏保守。
+2. **广告展示率**：Trends 公式 `B / A`，A = `sponsor_shown` 次数，B = `sponsor_ad_loaded` 次数，按 `$geoip_country_code`（访问者所在国，不是事件里的 `country` 出生国）拆分；再看 `sponsor_hidden` 按 `reason` 拆分，可以知道比如在中国是超时还是被拦截。
+3. **热门落地页**：`$pageview` 按 `$pathname` 计数，或 Web Analytics 面板加过滤 `app = gctime`。
+
 ## 免费个案评估（线索表单）
 
 `/consult/`（英文）和 `/zh/consult/`（中文）是由 `scripts/build_seo.py` 生成的静态页：简短说明 EB-1A / NIW 可能比现有队列更快、一张表单和隐私说明。表单提交到 Cloudflare Pages Function `POST /api/lead`（`functions/api/lead.js`），写入 D1 数据库 `gctime-leads`（Pages 生产环境绑定名 `LEADS`）。站主之后会把合格线索转介给合作移民律师和 EB-5 机构；页面不承诺任何结果，也不构成法律意见。
 
 - 字段：称呼（选填）、邮箱（必填）、微信或电话（选填）、类别（EB-1A / NIW / EB-2 / EB-3 / EB-5 / 不确定）、出生国（CN/IN/ROW/MX/PH）、优先日（选填）、当前身份（H-1B / F-1 / 其他在美身份 / 不在美国）、补充说明（≤1000 字）、页面语言、来源页、提交时间和必填的同意勾选。表结构见 `scripts/leads_schema.sql`。
-- 防滥用：服务端逐项校验；隐藏的 `website` 蜜罐字段有值时返回 `{ok:true}` 但不写库；同一 IP 滚动 24 小时最多 5 条成功提交，超出返回 429；请求体上限 8 KB；只接受 `application/json`，带 `Origin` 时只认本站域名。只保存 `HMAC-SHA256(LEAD_SALT, IP)`，不存原始 IP；`LEAD_SALT` 是 Pages 生产环境 secret。返回 `{ok:true}` 或 `{error:"..."}`。不调用第三方服务。
+- 防滥用：服务端逐项校验；隐藏的 `website` 蜜罐字段有值时返回 `{ok:true}` 但不写库；同一 IP 滚动 24 小时最多 5 条成功提交，超出返回 429；请求体上限 8 KB；只接受 `application/json`，带 `Origin` 时只认本站域名。只保存 `HMAC-SHA256(LEAD_SALT, IP)`，不存原始 IP；`LEAD_SALT` 是 Pages 生产环境 secret。返回 `{ok:true}` 或 `{error:"..."}`。服务端不调用第三方服务；页面上的匿名统计只记录提交结果代码、类别、出生国和语言（见上一节）。
 - 表单页不加载赞助广告脚本。应用内在预测结果下方有一行安静的入口（11 种语言），排期落地页和两个汇总页各有一个入口块；Service Worker 不拦截 `/api/*`，也不把评估页当作应用外壳缓存。
 - GitHub Pages 镜像和本地静态服务器没有 Functions，提交时提示到主站 `https://bracketboss2026.com/consult/` 提交。
 - 删除请求：用户可用同一邮箱再提交一次并在说明里写明，或在 GitHub 提 issue。
@@ -181,7 +212,7 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
 `npm run build:ui` 把 `src/shell.jsx` 和 `src/styles.css` 编译为忽略提交的 `assets/ui.js`、`assets/ui.css`，不拆分 chunk、不生成 source map。`npm run build` 继续生成 `dist/site/`、`dist/EB1A.html` 和 `dist/EB1A-offline.zip`；直接运行 `python3 scripts/build_site.py` 也会先编译 UI。
 
-`src/sponsor.js` 由在线构建单独复制、指纹化并注入页面底部（固定在视口底边，不进入页脚文档流），不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。展示延迟 `SHOW_DELAY_MS`、关闭隐藏时长 `DISMISS_MS` 和广告加载超时 `AD_LOAD_TIMEOUT_MS` 写在该文件顶部。
+`src/analytics.js`（匿名统计，见上文）与 `src/sponsor.js` 一样只进在线产物。`src/sponsor.js` 由在线构建单独复制、指纹化并注入页面底部（固定在视口底边，不进入页脚文档流），不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。展示延迟 `SHOW_DELAY_MS`、关闭隐藏时长 `DISMISS_MS` 和广告加载超时 `AD_LOAD_TIMEOUT_MS` 写在该文件顶部。
 
 Cloudflare 发布 job 会单独 sparse checkout `functions/`，`wrangler pages deploy` 从工作目录编译 Pages Functions；发布后向 `https://gctime.pages.dev/api/lead` POST `{}`，必须得到 JSON 400，否则视为 Functions 未上线而失败。`node --test tests/lead-function.test.mjs` 覆盖表单接口的校验、蜜罐和限流。
 

@@ -6,7 +6,8 @@ HTML (no app scripts): one page per category × country with the latest Visa Bul
 Final Action / Chart B Dates for Filing), month-over-month movement and a 24-month table, plus hubs,
 sitemap.xml, robots.txt and an Atom feed. Every number comes from the bulletin history; the pages make
 no forecast of their own and send readers to the predictor for that. Online builds add the same
-bottom sponsor banner as the app (src/sponsor.js, which only runs on the production hosts).
+bottom sponsor banner as the app (src/sponsor.js, which only runs on the production hosts). Online builds
+also load src/analytics.js on every page, including /consult/; it only loads PostHog on the production hosts.
 
 URL scheme (one hub + 25 category × country pages per UI language; strings in seo_locales.py):
   English   /visa-bulletin/            /visa-bulletin/eb-2-china/     (kept from the first release)
@@ -182,6 +183,15 @@ def switcher(lang, alts):
             f'<span aria-hidden="true">🌐</span>{esc(t["name"])}</summary><ul>{"".join(items)}</ul></details>')
 
 
+# 匿名统计脚本标签（src/analytics.js）；只有在线构建调用 build(analytics_src=…) 时非空，所有静态页都在 <head> 里加载。
+ANALYTICS_TAG = ""
+
+
+def analytics_tag(analytics_src):
+    """Anonymous usage analytics; the script itself only loads PostHog on the production hosts."""
+    return f'<script src="{esc(analytics_src)}" defer></script>\n' if analytics_src else ""
+
+
 def layout(lang, title, desc, path, body, jsonld, alts, sponsor):
     """The one place where <head> and the end of <body> are built for every static page."""
     t = TEXT[lang]
@@ -206,7 +216,7 @@ def layout(lang, title, desc, path, body, jsonld, alts, sponsor):
 <link rel="alternate" type="application/atom+xml" title="{esc(t['feed'])}" href="/feed.xml">
 <style>{STYLE}</style>
 <script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>
-</head>
+{ANALYTICS_TAG}</head>
 <body>
 <header class="site"><a href="/">{NAME}</a><nav class="lang"><a href="{t['hub_path']}">{esc(t['all'])}</a>{switcher(lang, alts)}</nav></header>
 <main>
@@ -232,10 +242,10 @@ def faq_block(t):
     return body, ld
 
 
-def consult_block(t):
-    """Quiet link from every bulletin page to the free case review form."""
+def consult_block(t, placement):
+    """Quiet link from every bulletin page to the free case review form. placement: landing | hub (analytics)."""
     return (f'<section class="consult-cta"><h2>{esc(t["consult_cta"])}</h2><p class="muted">{esc(t["consult_cta_note"])}</p>'
-            f'<a href="{t["consult_path"]}">{esc(t["consult_cta_link"])} {t["arrow"]}</a></section>')
+            f'<a href="{t["consult_path"]}" data-gc-cta="{placement}">{esc(t["consult_cta_link"])} {t["arrow"]}</a></section>')
 
 
 def build_page(lang, cat, country, monthly, sponsor):
@@ -273,7 +283,7 @@ def build_page(lang, cat, country, monthly, sponsor):
     body = (f"<h1>{heading(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
             f'<p class="muted">{esc(t["latest"].format(month=month_label(last, lang)))}</p>{cards}'
             f'<a class="cta" href="/">{esc(t["cta"])}</a><p class="muted">{esc(t["cta_note"])}</p>'
-            f"{table}{consult_block(t)}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
+            f"{table}{consult_block(t, 'landing')}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
             f'<p class="muted">{esc(t["updated"].format(month=month_label(last, lang)))}</p>')
     alts = alternates(lambda code: page_path(code, cat, country))
     jsonld = {"@context": "https://schema.org", "@graph": [
@@ -310,7 +320,7 @@ def build_hub(lang, monthly, sponsor):
             f"<table class=\"stack\"><thead><tr><th></th><th>{la}</th><th>{lb}</th>"
             f"<th>{lc}</th></tr></thead><tbody>{''.join(rows)}</tbody></table>")
     faq, faq_ld = faq_block(t)
-    body += consult_block(t) + faq
+    body += consult_block(t, "hub") + faq
     path = t["hub_path"]
     alts = alternates(lambda code: TEXT[code]["hub_path"])
     jsonld = {"@context": "https://schema.org", "@graph": [
@@ -355,7 +365,8 @@ CONSULT = {
         },
         "privacy_title": "Privacy",
         "privacy": [
-            "What we collect: the fields above, the page language, the page you came from, the time, and a one-way hash of your IP address that is only used to limit spam. Your IP address itself is not stored. This page has no ads or tracking scripts.",
+            "What we collect: the fields above, the page language, the page you came from, the time, and a one-way hash of your IP address that is only used to limit spam. Your IP address itself is not stored. This page has no ads.",
+            "Anonymous usage analytics: on the main site we use PostHog to count page views, clicks on this review link and whether a submission succeeded, together with the category and country of birth you chose. Your name, email, WeChat or phone, priority date and message are never sent to PostHog. Nothing is collected when your browser sends Do Not Track.",
             "Why: only to pass your request to partner immigration attorneys or EB-5 agencies who may contact you, and only with your consent above.",
             "Deletion: submit this form again with the same email and write “delete my data” in the message, or open an issue in the GitHub repository github.com/s546126/gctime (issues are public, so do not post personal details there). We will delete your record.",
             "Not legal advice: GC Time is an independent tool, not a law firm. Nothing here is legal advice, and no approval, timeline or result is promised.",
@@ -395,7 +406,8 @@ CONSULT = {
         },
         "privacy_title": "隐私说明",
         "privacy": [
-            "收集内容：上面填写的各项、页面语言、来源页面、提交时间，以及 IP 地址的单向哈希（仅用于限制垃圾提交，不保存 IP 本身）。本页没有广告或追踪脚本。",
+            "收集内容：上面填写的各项、页面语言、来源页面、提交时间，以及 IP 地址的单向哈希（仅用于限制垃圾提交，不保存 IP 本身）。本页没有广告。",
+            "匿名使用统计：主站使用 PostHog 统计页面访问、评估入口的点击和提交是否成功，并附带你选择的类别和出生国；你的称呼、邮箱、微信或电话、优先日和补充说明绝不会发送给 PostHog。浏览器开启“请勿追踪”（Do Not Track）时不收集。",
             "用途：仅在你同意的前提下，把申请转给可能联系你的合作移民律师或 EB-5 机构。",
             "删除：用同一邮箱再提交一次，并在补充说明里写“删除我的数据”；或在 GitHub 仓库 github.com/s546126/gctime 提 issue（issue 是公开的，请不要写个人信息）。我们会删除你的记录。",
             "不构成法律意见：GC Time 是独立工具，不是律所。本页内容不构成法律意见，也不承诺任何批准、时间或结果。",
@@ -411,14 +423,17 @@ function source(){try{var r=document.referrer&&new URL(document.referrer);if(r&&
 function locale(){var q=new URLSearchParams(location.search).get('lang');return q&&/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(q)?q:document.documentElement.lang;}
 form.addEventListener('submit',function(e){
 e.preventDefault();if(btn.disabled)return;
-var f=form.elements,body={name:f.name.value,email:f.email.value,contact:f.contact.value,category:f.category.value,country:f.country.value,
+var f=form.elements;
+// 匿名统计只带结果代码、类别、出生国和语言；不带姓名、邮箱、电话、优先日或留言。
+function track(code){try{var a=window.GCAnalytics;if(a)a.capture('lead_submit_result',{result:code==='ok'?'ok':'error',code:code,category:f.category.value,country:f.country.value,locale:locale()});}catch(x){}}
+var body={name:f.name.value,email:f.email.value,contact:f.contact.value,category:f.category.value,country:f.country.value,
 priority_date:f.priority_date.value,status:f.status.value,message:f.message.value,consent:f.consent.checked,website:f.website.value,
 locale:locale(),source:source()};
 btn.disabled=true;btn.textContent=M.sending;say('');
 fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit'})
 .then(function(r){var type=r.headers.get('content-type')||'';if(type.indexOf('application/json')<0)throw new Error('offline');return r.json();})
-.then(function(d){if(d&&d.ok){form.hidden=true;say(M.ok);out.focus();return;}say(M.errors[d&&d.error]||M.errors.generic);})
-.catch(function(){say(M.errors.offline,M.home);})
+.then(function(d){var ok=!!(d&&d.ok);track(ok?'ok':(d&&d.error)||'generic');if(ok){form.hidden=true;say(M.ok);out.focus();return;}say(M.errors[d&&d.error]||M.errors.generic);})
+.catch(function(){track('offline');say(M.errors.offline,M.home);})
 .then(function(){btn.disabled=false;btn.textContent=M.submit;});
 });
 })();"""
@@ -549,8 +564,10 @@ def write_page(site, path, text):
     target.write_text(text, encoding="utf-8")
 
 
-def build(site, sponsor_src=None, catalogs=None):
+def build(site, sponsor_src=None, catalogs=None, analytics_src=None):
     """Write the pages into `site` (dist/site). Returns the paths written, for tests."""
+    global ANALYTICS_TAG
+    ANALYTICS_TAG = analytics_tag(analytics_src)
     monthly = json.loads((ROOT / "data" / "visa_bulletin_history.json").read_text(encoding="utf-8"))["monthly"]
     catalogs = catalogs if catalogs is not None else (load_catalogs() if sponsor_src else {})
     pages, latest = [], "0000-00"
