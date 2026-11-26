@@ -133,6 +133,16 @@ def main():
         for co in COUNTRIES:
             for t in ("A", "B"):
                 cells[f"{cat}|{co}|{t}"] = {m: "C" for m in months("2022-05", last)}
+    # 晚于两份转录末期的月份由探测器从官方公告逐期追加(update_history_json)，重建时原样保留，不能被抹掉。
+    if os.path.exists(OUT):
+        prev = json.load(open(OUT, encoding="utf-8"))
+        for k, s in prev.get("monthly", {}).items():
+            extra = {m: v for m, v in s.items() if m > last}
+            if extra and k in cells:
+                cells[k].update(extra)
+        for s in cells.values():
+            if s:
+                last = max(last, max(s))
     print(f"覆盖 {len(cells)} 个序列，重叠格不一致 {mism} 处，末期 {last}")
     monthly = {k: v for k, v in cells.items()}
     doc = {
@@ -142,6 +152,7 @@ def main():
         "_sources": [
             "vyakunin/visa_bulletin visa_bulletin.db (2016-10 ~ 2025-12)",
             "yuchenlin/pd-tracker src/data/visa-bulletins.json (2021-09 ~ 2026-10)",
+            "2026-11 起：探测器 scripts/sniff_visa_bulletin.py 从 DOS 官方公告页逐期追加",
             "原始公告: https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
         ],
         "last_bulletin": last,
@@ -151,12 +162,11 @@ def main():
         json.dump(doc, f, ensure_ascii=False, indent=0, separators=(",", ":"))
     print("写入", OUT, os.path.getsize(OUT), "bytes")
 
-    # 压缩内嵌：EB-1A|CN 已在 HISTORY/HISTORY_B（探测器维护），此处略去；MX 与 ROW 完全相同者用别名
+    # 压缩内嵌：全部格子(含 EB-1A|CN)都从本 JSON 生成，index.html 不再另存手写序列
     comp = {}
-    for k, s in cells.items():
+    for k in sorted(cells, key=lambda k: (k != "EB-1A|CN|A", k != "EB-1A|CN|B")):
+        s = cells[k]
         cat, co, t = k.split("|")
-        if cat == "EB-1A" and co == "CN":
-            continue
         if cat.startswith("EB-5-"):
             continue          # set-aside 恒 current，无需序列
         if all(v == "C" for v in s.values()):

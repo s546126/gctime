@@ -159,13 +159,14 @@ jobs:
           base: main
           add-paths: |
             data/release_log.json
+            data/visa_bulletin_history.json
             index.html
           branch: auto/visa-bulletin-update
           delete-branch: true
           commit-message: "Auto: visa bulletin update"
           title: "🔎 探测到新签证公告（自动更新）"
           body: |
-            探测器检测到新一期签证公告，已自动更新 `data/release_log.json` 与 `index.html`，
+            探测器检测到新一期签证公告，已自动更新 `data/release_log.json`、`data/visa_bulletin_history.json` 与 `index.html`，
             **本 PR 将自动合并上线**（保留作审计记录）。
 
             数据已过理智门禁（合法日期 / 区间 / 移动幅度校验）。如发现有误：

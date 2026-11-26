@@ -61,15 +61,16 @@ Format: `iv_issuance_{month}_{year}.xlsx`
 
 | File | Description |
 |------|-------------|
-| visa_bulletin_history.json | Monthly Final Action (A) and Dates for Filing (B) series, Oct 2016 -> Oct 2026, for EB-1 / EB-2 / EB-3 / EB-4 / EB-5 (unreserved; pre-2022-05 = Non-Regional Center row) x ROW / CN / IN / MX / PH. `C` = current, `U` = unavailable. EB-5 set-asides (rural / high unemployment / infrastructure) have been Current for every country since 2022-05. Built by `scripts/build_bulletin_history.py`. The legacy EB-1 data key remains `EB-1A` for compatibility. |
+| visa_bulletin_history.json | Monthly Final Action (A) and Dates for Filing (B) series, Oct 2016 -> Nov 2026, for EB-1 / EB-2 / EB-3 / EB-4 / EB-5 (unreserved; pre-2022-05 = Non-Regional Center row) x ROW / CN / IN / MX / PH. `C` = current, `U` = unavailable. EB-5 set-asides (rural / high unemployment / infrastructure) have been Current for every country since 2022-05. Built by `scripts/build_bulletin_history.py`. The legacy EB-1 data key remains `EB-1A` for compatibility. |
 | category_calibration.json | Per (category, country) model calibration (advance rate, family multiplier, density knots, I-140 awaiting totals) written by `scripts/calibrate_categories.py --write`; the same block is embedded in `index.html` as `CELL_MODELS`. |
 
 **Provenance.** state.gov hosts (`travel`, `adoption`, `childabduction`) and law-firm sites are blocked in the sandbox this was built in, so the series are taken from two machine-readable transcriptions of the DOS tables, which agree cell-for-cell on all 2,520 overlapping cells (2021-09 -> 2025-12):
 
 * vyakunin/visa_bulletin `visa_bulletin.db` (parsed from DOS HTML, 2001-12 -> 2025-12)
 * yuchenlin/pd-tracker `src/data/visa-bulletins.json` (2021-09 -> 2026-10, includes the Oct 2026 bulletin)
+* From Nov 2026 on, the bulletin sniffer (`scripts/sniff_visa_bulletin.py`, `update_history_json`) appends each new bulletin parsed from the official DOS page. Nov 2026 (all 40 cells) was taken from the official travel.state.gov HTML.
 
-Spot checks against law-firm summaries surfaced by web search agree for Oct 2026 (EB-2 China 2021-10-01, EB-2 India 2013-11-01, EB-5 China 2016-12-01 / India 2023-12-01, EB-5 set-asides current). One discrepancy in the *pre-existing* `HISTORY` array in `index.html`: 2026-03 EB-1A China Final Action is `2023-03-15` there, but both transcriptions and a law-firm summary say `2023-03-01` (left untouched to keep EB-1A output identical).
+Spot checks against law-firm summaries surfaced by web search agree for Oct 2026 (EB-2 China 2021-10-01, EB-2 India 2013-11-01, EB-5 China 2016-12-01 / India 2023-12-01, EB-5 set-asides current). EB-1A China used to live in hand-written `HISTORY`/`HISTORY_B` arrays in `index.html`, which disagreed with this file in 6 months (A 2026-03; B 2024-10, 2025-07, 2025-12, 2026-01, 2026-03). Checked against the official bulletins, this file was right every time; EB-1A China is now generated from it like every other cell, and `scripts/check_project.py` asserts they match month by month.
 
 Not collected (no verifiable 2026 data): EB-3 Other Workers (EW) and EB-4 Certain Religious Workers rows, and the El Salvador/Guatemala/Honduras column (dropped from the bulletin after March 2023).
 
