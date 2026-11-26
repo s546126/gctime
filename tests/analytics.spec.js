@@ -24,6 +24,7 @@ const test = base.extend({
 
 async function seed(page, { mock = true, locale = 'zh-CN', dnt = false } = {}) {
   await page.addInitScript(({ saved, locale, mock, dnt }) => {
+    if (location.protocol === 'about:') return
     localStorage.setItem('eb1a_user_profile', JSON.stringify(saved))
     localStorage.setItem('gc_language', locale)
     if (mock) window.__GC_ANALYTICS_MOCK = []
@@ -86,9 +87,10 @@ test('local preview never contacts PostHog on the app, landing or consult pages'
   await openApp(page)
   await page.locator('.stat[data-pct="p90"]').click()
   await page.waitForTimeout(1300)
+  expect(await page.evaluate(() => ({ posthog: typeof window.posthog, live: window.GCAnalytics && window.GCAnalytics.live }))).toEqual({ posthog: 'undefined', live: false })
   for (const path of ['./visa-bulletin/', './visa-bulletin/eb-2-china/', './zh/consult/']) await page.goto(path)
   expect(requests.filter(url => posthogPattern.test(url))).toEqual([])
-  expect(await page.evaluate(() => ({ posthog: typeof window.posthog, live: window.GCAnalytics && window.GCAnalytics.live }))).toEqual({ posthog: 'undefined', live: false })
+  expect(await page.evaluate(() => typeof window.posthog)).toBe('undefined')
 })
 
 test('offline single file has no analytics loader and makes no PostHog request', async ({ page }) => {
