@@ -46,7 +46,7 @@ async function openSite(page, context, { origin = 'https://bracketboss2026.com',
       external.push({ url: url.href, referer: route.request().headers().referer })
       if (url.hostname === 'bauval.org') {
         if (blockAd) return route.abort()
-        return route.fulfill({ contentType: 'text/javascript', body: adMode === 'write' ? writeStub : iframeStub })
+        return route.fulfill({ contentType: 'text/javascript', body: adMode === 'write' ? writeStub : adMode === 'empty' ? '' : iframeStub })
       }
       return route.fulfill({ contentType: 'text/html', body: '<title>Mock sponsor destination</title>' })
     }
@@ -59,6 +59,8 @@ async function openSite(page, context, { origin = 'https://bracketboss2026.com',
   })
   await page.clock.setFixedTime(now)
   await page.addInitScript(({ last, storageFails, offline, storageKey }) => {
+    // 匿名统计的测试接缝：线上域名替身也不加载 PostHog，事件只记在这里。
+    window.__GC_ANALYTICS_MOCK = []
     localStorage.setItem('eb1a_user_profile', JSON.stringify({ pd: Date.UTC(2026, 0, 15), category: 'EB-1A', country: 'CN', path: 'AOS', family: 0 }))
     if (!sessionStorage.getItem('sponsor-test-initialized')) {
       if (last !== undefined) localStorage.setItem(storageKey, last)
@@ -358,4 +360,54 @@ test('online sponsor is fingerprinted and optional; offline artifact has no load
     const forbidden = offline.match(/effectivecpmnetwork|bauval\.org|6d1946abad3d3fdcc79373556a137876|d450c9cf5ef416c8ffc1907634e0d6e6|id=["']gc-sponsor-slot["']|sponsor\.[a-f0-9]{16}\.js|gc_sponsor_last_shown/g)
     expect(forbidden, path + ' must not include an ad destination, slot or loader').toBeNull()
   }
+})
+
+const sponsorEvents = page => page.evaluate(() => window.__GC_ANALYTICS_MOCK
+  .filter(item => item.event.startsWith('sponsor_'))
+  .map(item => [item.event, item.properties]))
+
+test('analytics: a rendered ad reports shown and loaded once, dismiss reports dismissed', async ({ page, context }) => {
+  await openSite(page, context)
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
+  await page.clock.runFor(adLoadTimeout)
+  expect(await sponsorEvents(page)).toEqual([
+    ['sponsor_shown', { unit: 'mobile', app: 'gctime' }],
+    ['sponsor_ad_loaded', { unit: 'mobile', app: 'gctime' }]
+  ])
+  await page.locator('#gc-sponsor-dismiss').click()
+  expect((await sponsorEvents(page)).slice(2)).toEqual([['sponsor_dismissed', { unit: 'mobile', ad_loaded: true, app: 'gctime' }]])
+})
+
+test('analytics: desktop unit is reported as desktop', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await openSite(page, context)
+  await expect(page.locator('#gc-sponsor-ad iframe')).toHaveCount(1)
+  expect((await sponsorEvents(page)).map(([name, props]) => name + ':' + props.unit)).toEqual(['sponsor_shown:desktop', 'sponsor_ad_loaded:desktop'])
+})
+
+for (const [reason, options, trigger] of [
+  ['error', { blockAd: true }, null],
+  ['timeout', { adMode: 'empty' }, null],
+  ['offline', { adMode: 'empty' }, 'offline']
+]) {
+  test(`analytics: sponsor_hidden reports ${reason}`, async ({ page, context }) => {
+    await openSite(page, context, options)
+    if (trigger) await page.evaluate(() => window.dispatchEvent(new Event('offline')))
+    else await page.clock.runFor(adLoadTimeout)
+    await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+    await page.clock.runFor(adLoadTimeout)
+    expect(await sponsorEvents(page)).toEqual([
+      ['sponsor_shown', { unit: 'mobile', app: 'gctime' }],
+      ['sponsor_hidden', { reason, unit: 'mobile', app: 'gctime' }]
+    ])
+  })
+}
+
+test('analytics: another tab dismiss hides silently, without a hidden reason', async ({ page, context }) => {
+  await openSite(page, context)
+  await page.evaluate(({ storageKey, now }) => {
+    window.dispatchEvent(new StorageEvent('storage', { key: storageKey, newValue: String(now + 1) }))
+  }, { storageKey, now })
+  await expect(page.locator('#gc-sponsor-slot')).toBeHidden()
+  expect((await sponsorEvents(page)).map(([name]) => name)).toEqual(['sponsor_shown', 'sponsor_ad_loaded'])
 })

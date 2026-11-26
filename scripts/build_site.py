@@ -20,7 +20,7 @@ ASSETS = (
     "vendor/gsap.min.js",
     "assets/ui.js", "assets/ui.css",
 )
-ONLINE_ASSETS = {"src/sponsor.js": "assets/sponsor.js"}
+ONLINE_ASSETS = {"src/sponsor.js": "assets/sponsor.js", "src/analytics.js": "assets/analytics.js"}
 
 
 def main(skip_ui=False):
@@ -52,6 +52,10 @@ def main(skip_ui=False):
         '</body>',
         '<div id="gc-sponsor-slot" hidden></div>\n<script src="assets/sponsor.js" defer></script>\n</body>',
     )
+    # 匿名使用统计同样只进在线产物；脚本自己再按正式域名和 HTTPS 判断是否加载 PostHog。
+    if html.count('</head>') != 1 or 'assets/analytics.js' in html:
+        raise SystemExit("在线统计脚本的页面挂载点不唯一")
+    html = html.replace('</head>', '<script src="assets/analytics.js" defer></script>\n</head>')
     published = {}
     for name in ("assets/ui.js", "assets/ui.css", *ONLINE_ASSETS.values()):
         source = site / name
@@ -65,7 +69,8 @@ def main(skip_ui=False):
     # 搜索引擎看不到 JS 渲染的内容：首页补描述与结构化数据，另生成纯 HTML 的排期页和站点地图。
     html = build_seo.add_head(html)
     (site / "index.html").write_text(html, encoding="utf-8")
-    build_seo.build(site, sponsor_src="/" + published["assets/sponsor.js"])
+    build_seo.build(site, sponsor_src="/" + published["assets/sponsor.js"],
+                    analytics_src="/" + published["assets/analytics.js"])
     # 内容变动就更新 worker，HTML、CSS 和 JS 作为同一份快照预缓存。
     digest = hashlib.sha256()
     for name in (*ASSETS, *ONLINE_ASSETS):

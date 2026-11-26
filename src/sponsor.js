@@ -91,6 +91,17 @@
   let adObserver = null
   let restoreWrite = null
   let mounted = false
+  let loaded = false
+
+  // 匿名统计（src/analytics.js，可能不存在或被拦截）：只记横幅单元和结果，不影响广告逻辑。
+  function track(event, props) {
+    try { if (window.GCAnalytics) window.GCAnalytics.capture(event, props) } catch { /* 统计失败不影响横幅。 */ }
+  }
+  function hideBecause(reason) {
+    if (!slot.hidden) track('sponsor_hidden', { reason, unit: slot.dataset.unit })
+    hide()
+  }
+  function hideOffline() { hideBecause('offline') }
 
   function render() {
     for (const [element, key] of messages) element.textContent = i18n.text(key)
@@ -114,7 +125,7 @@
     slot.hidden = true
     reserve()
     window.removeEventListener('gc:localechange', render)
-    window.removeEventListener('offline', hide)
+    window.removeEventListener('offline', hideOffline)
     window.removeEventListener('resize', reserve)
     window.removeEventListener('storage', syncFrequency)
     if (window.visualViewport) window.visualViewport.removeEventListener('resize', reserve)
@@ -127,6 +138,7 @@
   }
   function rememberDismiss() {
     try { localStorage.setItem(storageKey, String(Date.now())) } catch { /* 写失败也先关掉当前页。 */ }
+    if (!slot.hidden) track('sponsor_dismissed', { unit: slot.dataset.unit, ad_loaded: loaded })
     hide()
   }
   function adReady() {
@@ -135,6 +147,10 @@
     if (adObserver) adObserver.disconnect()
     adObserver = null
     reserve()
+    if (!loaded) {
+      loaded = true
+      track('sponsor_ad_loaded', { unit: slot.dataset.unit })
+    }
   }
   function mount(unit) {
     if (mounted || ad.querySelector('script, iframe')) return
@@ -157,14 +173,14 @@
     const script = document.createElement('script')
     script.src = unit.src
     script.async = true
-    script.addEventListener('error', hide)
+    script.addEventListener('error', () => hideBecause('error'))
     script.addEventListener('load', () => { if (ad.querySelector('iframe')) adReady() })
     ad.appendChild(script)
     if (typeof MutationObserver === 'function') {
       adObserver = new MutationObserver(() => { if (ad.querySelector('iframe')) adReady() })
       adObserver.observe(ad, { childList: true, subtree: true })
     }
-    loadTimer = window.setTimeout(() => { if (!ad.querySelector('iframe')) hide() }, AD_LOAD_TIMEOUT_MS)
+    loadTimer = window.setTimeout(() => { if (!ad.querySelector('iframe')) hideBecause('timeout') }, AD_LOAD_TIMEOUT_MS)
     if (ad.querySelector('iframe')) adReady()
   }
   function reveal() {
@@ -179,6 +195,7 @@
     slot.dataset.unit = unit.width >= 728 ? 'desktop' : 'mobile'
     slot.hidden = false
     reserve()
+    track('sponsor_shown', { unit: slot.dataset.unit })
     mount(unit)
   }
 
@@ -192,7 +209,7 @@
   // 不自动打开、不跳转；广告加载失败就收起横幅。关闭只隐藏，不解锁或限制预测。
   dismiss.addEventListener('click', rememberDismiss)
   window.addEventListener('gc:localechange', render)
-  window.addEventListener('offline', hide)
+  window.addEventListener('offline', hideOffline)
   window.addEventListener('resize', reserve)
   window.addEventListener('storage', syncFrequency)
   if (window.visualViewport) window.visualViewport.addEventListener('resize', reserve)

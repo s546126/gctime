@@ -176,7 +176,7 @@
       <div class="explain-content explain-static">
         <p><span class="step" data-i18n="explain.tablesTitle">表 A 与 表 B</span><br><span data-i18n-html="explain.tables"><b>表 A</b>（最终裁定日）决定何时获批；<b>表 B</b>（递交日期）决定何时能递 I-485。每月用哪张由官方指定。</span></p>
         <p><span class="step" data-i18n="explain.updatesTitle">数据更新</span><br><span data-i18n="explain.updates">公告发布后自动抓取更新；模型按 USCIS I-485 库存与 I-140 数据校准。</span></p>
-        <p><span class="step" data-i18n="explain.privacyTitle">隐私</span><br><span data-i18n="explain.privacy">你填的信息只存在本地浏览器，不上传。</span></p>
+        <p><span class="step" data-i18n="explain.privacyTitle">隐私</span><br><span data-i18n="explain.privacy">你填的优先日只保存在本地浏览器，不上传。在线版使用 PostHog 收集匿名使用统计（如所选类别、出生国、大致等待年数和页面访问），不收集姓名、邮箱、电话或具体优先日；浏览器开启“请勿追踪”时不收集。</span></p>
         <p><span class="step" data-i18n="explain.installTitle">安装</span><br><span data-i18n="explain.install">可添加到主屏幕，离线可用。</span></p>
         <p><span class="step" data-i18n="explain.authorTitle">作者</span><br><a href="https://x.com/DJWZ" target="_blank" rel="noopener" data-i18n="explain.author" data-i18n-params='{"author":"0xGarfield · @DJWZ"}'>由 0xGarfield · @DJWZ 制作。</a></p>
         <p class="explain-note" data-i18n-html="explain.legal">本工具为基于公开数据的统计估算，<b>不构成法律或移民建议</b>。结果受配额、政策、立法及个人情况影响，请以官方签证公告为准，并咨询持牌移民律师。</p>
@@ -212,7 +212,7 @@
 
   <div class="footer">
     <span data-i18n-html="footer.attribution">Fork 自 <a href="https://github.com/djzoom/EB1A" target="_blank" rel="noopener" dir="ltr">djzoom/EB1A</a></span><br>
-    <span class="footer-legal" data-i18n-html="footer.legal">本工具为统计估算，<b>不构成法律或移民建议</b>，不保证准确。以官方签证公告为准，并咨询持牌移民律师。你填的信息只存在本地浏览器。</span><br>
+    <span class="footer-legal" data-i18n-html="footer.legal">本工具为统计估算，<b>不构成法律或移民建议</b>，不保证准确。以官方签证公告为准，并咨询持牌移民律师。你的优先日只存在本地浏览器；在线版仅收集匿名使用统计。</span><br>
     © 2026 djzoom
   </div>
   <table style="display:none"><tbody id="monthly-tbody"></tbody></table>
@@ -1831,6 +1831,7 @@ function renderParams() {
         render();
         SUPPRESS_ANIM = false;
       });
+      trackPrediction('params');
     });
   });
 }
@@ -2255,6 +2256,40 @@ function renderBulletinPanel(presentationOnly) {
   if (isNew && !window._vbSeenScheduled) { window._vbSeenScheduled = true; setTimeout(markBulletinSeen, 3500); }
 }
 
+// 匿名使用统计：仅在线版有 window.GCAnalytics（src/analytics.js），离线版和本地开发为空操作。
+// 只发类别、出生国、情景和取整后的等待年数，不发具体优先日或任何联系方式。
+function track(event, props) {
+  try { if (window.GCAnalytics) window.GCAnalytics.capture(event, props); } catch (e) {}
+}
+function yearsUntilCurrent(table) {
+  var raw = cutoffRaw(profile.category, profile.country, table);
+  if (raw === 'current') return 0;
+  if (raw === 'unavailable') return null;
+  var cut = getCutoffData(profile.category, profile.country, table);
+  if (profile.pd && cut && profile.pd < cut) return 0;
+  var crossings = table === 'A' ? crossingsByPct : crossingsByPctB;
+  var at = crossings && crossings[selectedPercentile];
+  if (!at) return null;
+  return Math.max(0, Math.round((at - TODAY) / (365.25 * MS_PER_DAY)));
+}
+// 用户主动计算或改条件后去抖 1 秒，只记最后一次结果；拖动滑杆不会逐次上报。
+function trackPrediction(trigger) {
+  try {
+    if (!window.GCAnalytics || !profile.pd) return;
+    window.GCAnalytics.debounce('predict_run', function () {
+      var chart = FILING_CHART === 'A' || FILING_CHART === 'B' ? FILING_CHART : 'unknown';
+      var a = yearsUntilCurrent('A'), b = yearsUntilCurrent('B');
+      return {
+        trigger: trigger, category: profile.category, country: profile.country, chart: chart,
+        scenario: { p10: 'optimistic', p50: 'median', p90: 'conservative' }[selectedPercentile] || selectedPercentile,
+        supply: supplyScenario || 'custom', pace: paceMode,
+        result_bucket: chart === 'B' ? b : a, result_bucket_a: a, result_bucket_b: b,
+        shared: !!sharedState, locale: document.documentElement.lang
+      };
+    }, 1000);
+  } catch (e) {}
+}
+
 // Events
 (function () {
   var btn = document.getElementById('share-btn');
@@ -2267,6 +2302,7 @@ function renderBulletinPanel(presentationOnly) {
       pace: paceMode, percentile: selectedPercentile, supply: supplyScenario,
       params: currentParams, lang: document.documentElement.lang
     });
+    track('share_link_created', { category: profile.category, country: profile.country, locale: document.documentElement.lang });
     input.hidden = true;
     status.hidden = false;
     function done() { setMessage('action-status', 'action.sharedCopied'); }
@@ -2322,6 +2358,7 @@ document.getElementById('pe-save').addEventListener('click', function() {
   var nc = document.getElementById('pe-cat').value, nco = document.getElementById('pe-co').value;
   if (nc !== profile.category || nco !== profile.country) applyCell(nc, nco);   // 换了类别/国家：换模型并重画
   else render();
+  trackPrediction('save');
 });
 document.getElementById('pe-cancel').addEventListener('click', function() {
   writeDateGroup('pe-pd', profile.pd);
@@ -2339,11 +2376,12 @@ document.querySelectorAll('.stat').forEach(function(cell) {
     renderHero();
     renderStats();
     redrawChart();
+    trackPrediction('scenario');
   });
 });
 
 document.querySelectorAll('.sc-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() { applySupplyScenario(btn.dataset.sc); });
+  btn.addEventListener('click', function() { applySupplyScenario(btn.dataset.sc); trackPrediction('supply'); });
 });
 function syncPaceUI() {
   document.querySelectorAll('.pace-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.pace === paceMode); });
@@ -2359,11 +2397,11 @@ window.setPaceMode = function(m) {
   if (profile.pd) render();
 };
 document.querySelectorAll('.pace-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() { if (btn.dataset.pace !== paceMode) setPaceMode(btn.dataset.pace); });
+  btn.addEventListener('click', function() { if (btn.dataset.pace !== paceMode) { setPaceMode(btn.dataset.pace); trackPrediction('pace'); } });
 });
 syncPaceUI();
 
-document.getElementById('replay-btn').addEventListener('click', replayDeduction);
+document.getElementById('replay-btn').addEventListener('click', function () { replayDeduction(); trackPrediction('replay'); });
 document.getElementById('refresh-btn').addEventListener('click', function () {
   this.disabled = true;
   // 仅重载当前已发布页面；不删除同源缓存，也不声称触发官方公告抓取。
@@ -2415,6 +2453,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     var nc = document.getElementById('wf-cat').value, nco = document.getElementById('wf-co').value;
     if (nc !== profile.category || nco !== profile.country) applyCell(nc, nco);   // 欢迎面板里选的类别/国家
     else render();
+    trackPrediction('start');
   });
 })();
 
@@ -2452,6 +2491,7 @@ renderParams();
     document.querySelectorAll('.sc-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.sc === 'normal'); });
     renderParams();
     if (profile.pd) render();
+    trackPrediction('reset');
   });
 })();
 

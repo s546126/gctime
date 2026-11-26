@@ -47,7 +47,8 @@ def check_consult(site):
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         site = Path(tmp)
-        paths = build_seo.build(site, sponsor_src="/assets/sponsor.test.js", catalogs=CATALOGS)
+        paths = build_seo.build(site, sponsor_src="/assets/sponsor.test.js", catalogs=CATALOGS,
+                               analytics_src="/assets/analytics.test.js")
         assert "/visa-bulletin/eb-2-china/" in paths and "/zh/eb-2-china/" in paths, paths
         sitemap = (site / "sitemap.xml").read_text(encoding="utf-8")
         for path in paths:
@@ -60,13 +61,20 @@ def main():
             assert parser.title == 1, path
             for link in parser.links:
                 assert link == "/" or link in paths, (path, link)
+            # 匿名统计在所有静态页（含评估页）加载，挂在 <head> 里。
+            assert text.count('<script src="/assets/analytics.test.js" defer></script>') == 1, path
+            assert text.index("analytics.test.js") < text.index("</head>"), path
             if path in CONSULT:
+                assert "lead_submit_result" in text and "PostHog" in text, path
+                assert "no ads or tracking scripts" not in text and "没有广告或追踪脚本" not in text, path
                 # 收集联系方式的页面不加载第三方广告脚本。
                 assert 'id="gc-sponsor-slot"' not in text and "sponsor.test.js" not in text, path
                 continue
             assert 'id="gc-sponsor-slot"' in text and "/assets/sponsor.test.js" in text, path
             consult = CONSULT[0] if path.startswith("/visa-bulletin/") else CONSULT[1]
             assert f'<section class="consult-cta">' in text and f'href="{consult}"' in text, path
+            placement = "hub" if path in ("/visa-bulletin/", "/zh/visa-bulletin/") else "landing"
+            assert f'href="{consult}" data-gc-cta="{placement}"' in text, path
             assert "app.brand" not in text, "只应带 sponsor.* 文案"
         monthly = json.loads((build_seo.ROOT / "data" / "visa_bulletin_history.json").read_text())["monthly"]
         hist = monthly["EB-2|CN|A"]
@@ -79,6 +87,7 @@ def main():
         empty = Path(tmp) / "plain"
         build_seo.build(empty)
         assert 'id="gc-sponsor-slot"' not in (empty / "visa-bulletin" / "index.html").read_text(encoding="utf-8")
+        assert "analytics" not in (empty / "consult" / "index.html").read_text(encoding="utf-8").split("<main>")[0]
     head = build_seo.add_head("<html><head></head><body></body></html>")
     assert head.count('rel="canonical"') == 1 and "/visa-bulletin/eb-1-india/" in head
     print("✅ SEO 页面检查通过")
