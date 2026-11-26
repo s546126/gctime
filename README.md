@@ -59,7 +59,7 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 | `sponsor_hidden` | 横幅因故收起 | `reason`（timeout / error / offline）、`unit` |
 | `sponsor_dismissed` | 用户点「关闭」 | `unit`、`ad_loaded` |
 
-在 PostHog 里查看：项目与 Bracket Boss 相同，所有 Insight 加过滤 `app = gctime`（或 `$host` 属于三个正式域名）。建议的 Insight：
+在 PostHog 里查看：项目与 Bracket Boss 相同，所有 Insight 加过滤 `app = gctime`。不要用 `$host` 区分：Bracket Boss 也曾部署在 `bracketboss2026.com`，同一主机名下的旧事件属于它。建议的 Insight：
 
 1. **漏斗**：`$pageview` → `predict_run` → `consult_cta_click` → `lead_submit_result`（过滤 `result = ok`），按 `placement` 或首个 `$pathname` 拆分。只看过而没再操作的老用户不会产生 `predict_run`，漏斗第二步因此偏保守。
 2. **广告展示率**：Trends 公式 `B / A`，A = `sponsor_shown` 次数，B = `sponsor_ad_loaded` 次数，按 `$geoip_country_code`（访问者所在国，不是事件里的 `country` 出生国）拆分；再看 `sponsor_hidden` 按 `reason` 拆分，可以知道比如在中国是超时还是被拦截。

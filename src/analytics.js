@@ -66,6 +66,7 @@
       const ph = window.posthog = window.posthog || []
       if (!ph.__SV) {
         ph._i = []
+        ph.people = ph.people || []
         ph.init = function (token, config, name) {
           const methods = ['capture', 'register', 'register_once', 'unregister', 'opt_out_capturing', 'opt_in_capturing',
             'set_config', 'reset', 'get_distinct_id', 'getFeatureFlag', 'isFeatureEnabled', 'onFeatureFlags', 'reloadFeatureFlags']
