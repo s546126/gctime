@@ -99,12 +99,13 @@ function Dashboard({ nodes }) {
           <div className="forecast-sheet">
           <Widget className="forecast-widget">
             <Widget.Header className="sr-only"><Widget.Title>{text('shell.forecast')}</Widget.Title></Widget.Header>
-            <Widget.Content><LegacySlot node={nodes.result} /><ConsultLink /></Widget.Content>
+            <Widget.Content><LegacySlot node={nodes.result} /></Widget.Content>
           </Widget>
           <Widget className="chart-widget">
             <Widget.Header><div><Widget.Title>{text('shell.chart')}</Widget.Title><EngineText component={Widget.Description} id="chart-description" initialKey="shell.chartDescription" /></div><span className="model-label">{text('shell.simulations', { count: 500 })}</span></Widget.Header>
             <Widget.Content><LegacySlot node={nodes.chart} /></Widget.Content>
           </Widget>
+          <ConsultLink />
           </div>
           <Widget className="details-widget">
             <Widget.Header><Widget.Title>{text('shell.details')}</Widget.Title><EngineText component="span" id="bulletin-version" className="model-label" initialKey="tab.bulletin" /></Widget.Header>

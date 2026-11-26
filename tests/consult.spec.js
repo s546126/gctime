@@ -20,9 +20,9 @@ async function openApp(page, locale) {
   await expect(page.locator('#hero-value')).not.toHaveText('--')
 }
 
-test('free case review CTA sits with the forecast result in every locale', async ({ page }) => {
+test('free case review CTA sits in the forecast sheet, below the trend, in every locale', async ({ page }) => {
   await openApp(page, 'zh-CN')
-  const cta = page.locator('.forecast-widget #consult-cta')
+  const cta = page.locator('.forecast-sheet > #consult-cta')
   await expect(cta).toBeVisible()
   await expect(cta.locator('a')).toHaveText('免费 EB-1A / NIW 个案评估')
   await expect(cta.locator('a')).toHaveAttribute('href', './zh/consult/')
