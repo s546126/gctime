@@ -125,6 +125,64 @@ def check_sponsor():
             raise SystemExit(f"{path.name} 的隐私说明需要写明广告网络可能收到 IP")
 
 
+def _ym(s):
+    y, m = s[:7].split("-")
+    return int(y) * 12 + int(m) - 1
+
+
+def check_bulletin_data():
+    """公告数据一致性：data/visa_bulletin_history.json 是唯一来源。
+    - last_bulletin 必须等于页面声明的最新一期(VB_YEAR-VB_MON)，且每个序列都到这一期为止；
+      否则页面会把旧数据标成新一期(2026-11 只更新了 EB-1 中国就是这样)。
+    - index.html 的 HIST_DATA 展开后逐月等于 JSON；CUTOFF_DATA 等于 JSON 末期值。"""
+    import re
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    doc = json.loads((ROOT / "data" / "visa_bulletin_history.json").read_text(encoding="utf-8"))
+    monthly, last = doc["monthly"], doc["last_bulletin"]
+    m = re.search(r"var VB_YEAR = (\d+), VB_MON = (\d+);", html)
+    if not m:
+        raise SystemExit("index.html 缺 VB_YEAR / VB_MON")
+    want = f"{int(m.group(1))}-{int(m.group(2)):02d}"
+    if last != want:
+        raise SystemExit(f"visa_bulletin_history.json 的 last_bulletin={last}，页面声明最新一期 {want}")
+    stale = sorted(k for k, s in monthly.items() if max(s) != last)
+    if stale:
+        raise SystemExit(f"{len(stale)} 个序列没有更新到 {last}：{', '.join(stale[:8])}{' …' if len(stale) > 8 else ''}")
+    if re.search(r"\bvar HISTORY(_B)? = \[", html):
+        raise SystemExit("index.html 又出现手写 HISTORY/HISTORY_B；EB-1A 中国必须从 HIST_DATA(=JSON) 读取")
+
+    hm = re.search(r"/\*HIST_DATA_BEGIN\*/(.*?)/\*HIST_DATA_END\*/", html, re.S)
+    hist = json.loads(hm.group(1))
+    for key, pts in hist.items():
+        if key not in monthly:
+            raise SystemExit(f"HIST_DATA 有 JSON 中不存在的序列 {key}")
+        src = monthly[key]
+        exp = {}
+        for i, (x, v) in enumerate(pts):
+            end = _ym(pts[i + 1][0]) if i + 1 < len(pts) else _ym(x) + 1
+            for mi in range(_ym(x), end):
+                exp[mi] = v
+        got = {_ym(k): v for k, v in src.items()}
+        bad = [f"{mi // 12}-{mi % 12 + 1:02d}" for mi in sorted(got) if exp.get(mi) != got[mi]]
+        if bad or max(exp) != max(got):
+            raise SystemExit(f"HIST_DATA {key} 与 visa_bulletin_history.json 不一致：{', '.join(bad[:6]) or '末期不同'}")
+    missing = sorted(k for k in monthly if k not in hist and not k.split("|")[0].startswith("EB-5-"))
+    if missing:
+        raise SystemExit(f"HIST_DATA 缺少序列：{', '.join(missing[:8])}")
+
+    cm = re.search(r"var CUTOFF_DATA = \{(.*?)\}; // CUTOFF_DATA_END", html, re.S)
+    conv = {"current": "C", "unavailable": "U"}
+    for line in cm.group(1).splitlines():
+        lm = re.match(r"\s*'([A-Za-z0-9-]+)':\s*\{(.*)\}\s*,?\s*$", line)
+        if not lm:
+            continue
+        for co, a, b in re.findall(r"'([A-Z]+)':\s*\{\s*A:\s*'([^']*)',\s*B:\s*'([^']*)'\s*\}", lm.group(2)):
+            for t, v in (("A", a), ("B", b)):
+                key = f"{lm.group(1)}|{co}|{t}"
+                if key in monthly and monthly[key].get(last) != conv.get(v, v):
+                    raise SystemExit(f"CUTOFF_DATA {key}={v} 与 JSON {last} 期 {monthly[key].get(last)} 不一致")
+
+
 def main(source_only=False):
     for path in sorted((ROOT / "scripts").glob("*.py")):
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -152,6 +210,7 @@ def main(source_only=False):
     if not source_only:
         subprocess.run(["node", "--check", str(ROOT / "assets" / "ui.js")], check=True)
     check_sponsor()
+    check_bulletin_data()
     print("✓ Python / Shell / JavaScript 语法、JSON 和页面资源检查通过")
 
 

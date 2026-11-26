@@ -5,7 +5,7 @@
 （同一 PD 的库存随 DFF 放开而累积、随裁定而消耗，不能用单一晚快照代替历史）。
 
 输入(真实)：
-  1) cutoff 轨迹  : index.html HISTORY(表A)
+  1) cutoff 轨迹  : data/visa_bulletin_history.json 的 EB-1A|CN|A(表A)
   2) PD 月密度    : data/raw/uscis/I485_Pending_Inventory_*.xlsx 多份快照(按 as-of 时点匹配)
   3) 未来需求池   : I-140 China EB1 awaiting = 13,598
 
@@ -20,7 +20,7 @@ from collections import defaultdict
 import openpyxl
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INDEX = os.path.join(ROOT, "index.html")
+HIST_JSON = os.path.join(ROOT, "data", "visa_bulletin_history.json")
 SNAP_GLOB = os.path.join(ROOT, "data/raw/uscis/I485_Pending_Inventory_*.xlsx")
 I140_CHINA_EB1 = 13598
 MO = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -29,10 +29,11 @@ W = [0.338,0.183,0.139,0.110,0.057,0.037,0.047,0.017,0.022,0.026,0.020,0.004]
 
 
 def parse_history():
-    s = open(INDEX, encoding="utf-8").read()
-    m = re.search(r"var HISTORY = \[(.*?)\]\.map", s, re.S)
-    pts = re.findall(r"\['(\d{4}-\d{2}-\d{2})','(\d{4}-\d{2}-\d{2})'\]", m.group(1))
-    return [(date.fromisoformat(a), date.fromisoformat(b)) for a, b in pts]
+    """EB-1A 中国表A 月度序列(data/visa_bulletin_history.json，唯一来源)；C/U 月份没有日期，略去。"""
+    import json
+    monthly = json.load(open(HIST_JSON, encoding="utf-8"))["monthly"]["EB-1A|CN|A"]
+    return [(date.fromisoformat(m + "-15"), date.fromisoformat(v))
+            for m, v in sorted(monthly.items()) if v not in ("C", "U")]
 
 
 def load_snapshots():

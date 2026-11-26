@@ -162,12 +162,11 @@ def main():
         json.dump(doc, f, ensure_ascii=False, indent=0, separators=(",", ":"))
     print("写入", OUT, os.path.getsize(OUT), "bytes")
 
-    # 压缩内嵌：EB-1A|CN 已在 HISTORY/HISTORY_B（探测器维护），此处略去；MX 与 ROW 完全相同者用别名
+    # 压缩内嵌：全部格子(含 EB-1A|CN)都从本 JSON 生成，index.html 不再另存手写序列
     comp = {}
-    for k, s in cells.items():
+    for k in sorted(cells, key=lambda k: (k != "EB-1A|CN|A", k != "EB-1A|CN|B")):
+        s = cells[k]
         cat, co, t = k.split("|")
-        if cat == "EB-1A" and co == "CN":
-            continue
         if cat.startswith("EB-5-"):
             continue          # set-aside 恒 current，无需序列
         if all(v == "C" for v in s.values()):

@@ -464,9 +464,39 @@ def _valid_cell_value(v):
     return v in ("current", "unavailable") or parse_iso(v) is not None
 
 
+def _hist_append(hist, key, bull, v):
+    """HIST_DATA 某序列追加本期点（值 'YYYY-MM-DD' / 'current' / 'unavailable'）。"""
+    val = "C" if v == "current" else ("U" if v == "unavailable" else v)
+    pts = hist.setdefault(key, [])
+    if pts and pts[-1][0] == bull:
+        pts[-1][1] = val
+    elif len(pts) >= 2 and pts[-1][1] == val and pts[-2][1] == val:
+        pts[-1][0] = bull            # 平台期：只把末点(=最新月标记)往后挪
+    else:
+        pts.append([bull, val])
+
+
+def _write_hist_block(s, hist):
+    body = "{\n" + ",\n".join("  " + json.dumps(k) + ":" + json.dumps(v, separators=(",", ":"))
+                              for k, v in hist.items()) + "\n}"
+    return re.sub(r"/\*HIST_DATA_BEGIN\*/.*?/\*HIST_DATA_END\*/",
+                  lambda m: "/*HIST_DATA_BEGIN*/" + body + "/*HIST_DATA_END*/", s, count=1, flags=re.S)
+
+
+def append_eb1cn_hist(s, bull, fad, dff):
+    """EB-1A 中国的本期点追加进 HIST_DATA（与其他格子同一套序列；旧的手写 HISTORY/HISTORY_B 已移除）。"""
+    hm = re.search(r"/\*HIST_DATA_BEGIN\*/(.*?)/\*HIST_DATA_END\*/", s, re.S)
+    if not hm:
+        raise ValueError("index.html 缺 HIST_DATA 块")
+    hist = json.loads(hm.group(1))
+    for t, v in (("A", fad), ("B", dff)):
+        _hist_append(hist, f"EB-1A|CN|{t}", bull, "current" if v.lower() == "current" else v)
+    return _write_hist_block(s, hist)
+
+
 def apply_cells_to_index(s, cells, bull):
     """把多类别格子写进 index.html：整块重写 CUTOFF_DATA，并给 HIST_DATA 追加本期点。
-    EB-1A|CN 不在此处理（由 update_index 原有逻辑 + HISTORY/HISTORY_B 维护）。返回新文本；任何一格非法则跳过该格。"""
+    EB-1A|CN 不在此处理（由 update_index 的 EB-1A 正则与 append_eb1cn_hist 维护）。返回新文本；任何一格非法则跳过该格。"""
     cut = read_cutoff_block(s)
     hm = re.search(r"/\*HIST_DATA_BEGIN\*/(.*?)/\*HIST_DATA_END\*/", s, re.S)
     hist = json.loads(hm.group(1)) if hm else None
@@ -481,20 +511,10 @@ def apply_cells_to_index(s, cells, bull):
         n_upd += 1
         if hist is not None and not cat.startswith("EB-5-"):
             for t, v in (("A", a), ("B", b)):
-                val = "C" if v == "current" else ("U" if v == "unavailable" else v)
-                pts = hist.setdefault(f"{cat}|{co}|{t}", [])
-                if pts and pts[-1][0] == bull:
-                    pts[-1][1] = val
-                elif len(pts) >= 2 and pts[-1][1] == val and pts[-2][1] == val:
-                    pts[-1][0] = bull            # 平台期：只把末点(=最新月标记)往后挪
-                else:
-                    pts.append([bull, val])
+                _hist_append(hist, f"{cat}|{co}|{t}", bull, v)
     s = write_cutoff_block(s, cut)
     if hist is not None:
-        body = "{\n" + ",\n".join("  " + json.dumps(k) + ":" + json.dumps(v, separators=(",", ":"))
-                                  for k, v in hist.items()) + "\n}"
-        s = re.sub(r"/\*HIST_DATA_BEGIN\*/.*?/\*HIST_DATA_END\*/",
-                   lambda m: "/*HIST_DATA_BEGIN*/" + body + "/*HIST_DATA_END*/", s, count=1, flags=re.S)
+        s = _write_hist_block(s, hist)
     print(f"[cells] 已写入 {n_upd} 个格子的 CUTOFF_DATA / HIST_DATA（{bull}）")
     return s
 
@@ -1110,7 +1130,7 @@ def probe_target(ty, tm, tag, log, args, t_now, late=False):
         try:
             # 补探命中 → detected=None:页面显示「发布日未知」,而不是把补探那天渲染成发布日
             update_index(ty, tm, fad, dff, (None if late else t), est=est_time, cells=cells)
-            print("[index] 已更新 CUTOFF_DATA / HISTORY / VB_RELEASED；FILING_CHART 已自动判定(A/B 或待确认)")
+            print("[index] 已更新 CUTOFF_DATA / HIST_DATA / VB_RELEASED；FILING_CHART 已自动判定(A/B 或待确认)")
             # 标题+正文写进 GITHUB_ENV；由 workflow 在"确实新建了复核 PR"时才推送一次，防刷屏。
             _emit_env("BARK_TITLE", f"EB1A · {ty}年{tm}月排期已更新")
             _emit_env("BARK_BODY",
@@ -1269,7 +1289,7 @@ def main():
 
 
 def update_index(ty, tm, fad, dff, detected, est=False, chart_override=None, manual_entry=False, cells=None):
-    """把新一期表A/表B 写回 index.html：更新 CUTOFF_DATA、VB_* 公告元信息，并追加 HISTORY/HISTORY_B。
+    """把新一期表A/表B 写回 index.html：更新 CUTOFF_DATA、VB_* 公告元信息，并给 HIST_DATA 追加 EB-1A 中国本期点。
     detected: 本期探测到的时刻(aware datetime, ET)；既写显示用日期 VB_RELEASED，也写精确时刻 VB_RELEASED_TS。
     est=True(经 Wayback 兜底)时 VB_RELEASED_EST 置 true → 前端显示加「约」。
     chart_override in ('A','B','?')：手动录入且已知用表时传入，跳过必然 403 的 USCIS 抓取。"""
@@ -1331,15 +1351,8 @@ def update_index(ty, tm, fad, dff, detected, est=False, chart_override=None, man
     s = re.sub(r"(var FILING_CHART_STATE = ')[^']*(')",
                lambda m: m.group(1) + chart_state + m.group(2), s, count=1)
 
-    # 2) 追加 HISTORY（表A）与 HISTORY_B（表B）最新点（若该 bulletin 月尚未存在）
-    # 判重只看单引号形式 ['2026-10-15',…]：HIST_DATA 是 JSON(双引号)，也含同样的日期串，不能用裸子串判断
-    if f"['{bull}'," not in s:
-        s = re.sub(r"(\n\]\.map\(function\(p\) \{ return \{ x: new Date\(p\[0\]\)\.getTime\(\),"
-                   r" y: new Date\(p\[1\]\)\.getTime\(\) \}; \}\);\s*\n\s*var HISTORY_B)",
-                   f",\n  ['{bull}','{fad}']\\1", s, count=1)
-        s = re.sub(r"(\n\]\.map\(function\(p\) \{ return \{ x: new Date\(p\[0\]\)\.getTime\(\),"
-                   r" y: new Date\(p\[1\]\)\.getTime\(\) \}; \}\);\s*\n\s*// 当前签证公告状态)",
-                   f",\n  ['{bull}','{dff}']\\1", s, count=1)
+    # 2) EB-1A 中国本期点追加进 HIST_DATA（旧的手写 HISTORY/HISTORY_B 曾与 JSON 漂移 6 个月，已移除）
+    s = append_eb1cn_hist(s, bull, fad, dff)
 
     # 3) 追加发布日到 RELEASE_HISTORY（供"下月发布预测"和未来研究），若该期尚未记录
     # B4) 首见时间一经写入不得覆写：已存在该期且不是 unknown 占位，就原样保留。

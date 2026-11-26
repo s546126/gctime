@@ -261,6 +261,17 @@ check("HIST_DATA 新序列按 U 记入", _h["EB-2|IN|A"][-1], ["2026-10-15", "U"
 _h2 = _json2.loads(S.apply_cells_to_index(MINI, {("EB-2", "CN"): ("2021-06-01", "2022-01-01")}, "2026-10-15")
                    .split("/*HIST_DATA_BEGIN*/")[1].split("/*HIST_DATA_END*/")[0])
 check("HIST_DATA 平台期 → 只挪末点，不膨胀", _h2["EB-2|CN|A"], [["2021-06-15", "2021-06-01"], ["2026-10-15", "2021-06-01"]])
+# EB-1A 中国：本期点进 HIST_DATA(手写 HISTORY/HISTORY_B 已移除)；同期重跑只改值不重复追加
+_mini_cn = ("var HIST_DATA = /*HIST_DATA_BEGIN*/{\n"
+            "  \"EB-1A|CN|A\":[[\"2026-09-15\",\"2023-07-01\"],[\"2026-10-15\",\"2023-07-01\"]],\n"
+            "  \"EB-1A|CN|B\":[[\"2026-10-15\",\"2024-07-01\"]]\n"
+            "}/*HIST_DATA_END*/;\n")
+_cn = S.append_eb1cn_hist(_mini_cn, "2026-11-15", "2023-08-01", "2024-07-01")
+_cn = S.append_eb1cn_hist(_cn, "2026-11-15", "2023-08-01", "2024-07-01")
+_hc = _json2.loads(_cn.split("/*HIST_DATA_BEGIN*/")[1].split("/*HIST_DATA_END*/")[0])
+check("EB-1A 中国表A 本期点进 HIST_DATA，重跑不重复",
+      _hc["EB-1A|CN|A"], [["2026-09-15", "2023-07-01"], ["2026-10-15", "2023-07-01"], ["2026-11-15", "2023-08-01"]])
+check("EB-1A 中国表B 本期点进 HIST_DATA", _hc["EB-1A|CN|B"][-1], ["2026-11-15", "2024-07-01"])
 # 真实 index.html：块可读且往返幂等（防止格式漂移让探测器下次写坏文件）
 _idx = open(S.INDEX, encoding="utf-8").read()
 check("index.html 的 CUTOFF_DATA 往返幂等", S.write_cutoff_block(_idx, S.read_cutoff_block(_idx)) == _idx, True)
