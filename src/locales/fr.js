@@ -33,6 +33,8 @@ export default {
   'shell.chartDescriptionB': 'Tableau B · Dépôt : historique et prévision',
   'shell.simulations': '{count} simulations',
   'shell.details': 'Données et hypothèses',
+  'consult.title': 'Envie d’une voie plus rapide ?',
+  'consult.link': 'Évaluation gratuite de votre dossier EB-1A / NIW',
   'welcome.title': 'Prévision de carte verte',
   'welcome.description': 'Choisissez votre catégorie et votre pays de naissance, puis saisissez votre date de priorité pour estimer votre attente (EB-1 à EB-5).',
   'welcome.start': 'Lancer la prévision',

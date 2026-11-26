@@ -33,6 +33,8 @@ export default {
   'shell.chartDescriptionB': 'الجدول B · تقديم الطلب: السجل والتوقع',
   'shell.simulations': '{count} محاكاة',
   'shell.details': 'البيانات والافتراضات',
+  'consult.title': 'هل تبحث عن طريق أسرع؟',
+  'consult.link': 'مراجعة مجانية لحالتك في EB-1A / NIW',
   'welcome.title': 'توقع موعد البطاقة الخضراء',
   'welcome.description': 'اختر الفئة وبلد الميلاد وأدخل تاريخ الأولوية لتقدير موعد وصول دورك، من EB-1 إلى EB-5.',
   'welcome.start': 'بدء التوقع',

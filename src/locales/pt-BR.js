@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': 'Tabela B · Envio do pedido: histórico e projeção',
   'shell.simulations': '{count} simulações',
   'shell.details': 'Dados e premissas',
+  'consult.title': 'Quer um caminho mais rápido?',
+  'consult.link': 'Análise gratuita do seu caso EB-1A / NIW',
   'welcome.title': 'Projeção de datas de prioridade',
   'welcome.description': 'Selecione sua categoria e país de nascimento e informe sua data de prioridade para estimar quando poderá chegar sua vez de obter o Green Card (EB-1 ~ EB-5).',
   'welcome.start': 'Calcular projeção',

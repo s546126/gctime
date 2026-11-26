@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': '表 B · 递交申请：历史与预测',
   'shell.simulations': '{count} 次模拟',
   'shell.details': '数据与假设',
+  'consult.title': '想走更快的路？',
+  'consult.link': '免费 EB-1A / NIW 个案评估',
   'welcome.title': '绿卡排期推演',
   'welcome.description': '选择你的类别与出生国，输入优先日，估算绿卡大约何时轮到你（EB-1 ~ EB-5）。',
   'welcome.start': '开始预测',

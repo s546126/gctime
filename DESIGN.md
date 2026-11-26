@@ -32,6 +32,7 @@ SVG viewBox 与实际容器尺寸一致，桌面 340px 高、手机 280px 高。
 - React 独占外壳；原引擎独占 LegacySlot 内的 DOM。
 - 不把 HeroUI token、授权包源码或 source map 提交到仓库。
 - 不新增服务器、账户、遥测或外部字体依赖。
+- 唯一例外（站主批准）：免费个案评估表单 `/consult/` 使用 Cloudflare Pages Function `/api/lead` 与 D1 保存用户主动提交的线索；不做账户、遥测或第三方调用，表单页不加载广告。应用内入口是结果下方的一行文字链接，不做营销横幅。
 - 离线 HTML 必须内联所有必要 JS/CSS。
 
 ## 8. 响应式和可访问性

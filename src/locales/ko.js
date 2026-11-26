@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': '표 B · 서류 접수: 과거와 예측',
   'shell.simulations': '{count}회 시뮬레이션',
   'shell.details': '데이터와 가정',
+  'consult.title': '더 빠른 경로를 찾고 계신가요?',
+  'consult.link': 'EB-1A / NIW 무료 사례 검토',
   'welcome.title': '영주권 문호 예측',
   'welcome.description': '이민 범주와 출생국을 선택하고 우선일자를 입력하면 영주권 차례가 올 시점을 추정합니다(EB-1 ~ EB-5).',
   'welcome.start': '예측 시작',

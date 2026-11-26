@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': 'तालिका B · आवेदन दाखिल करना: पिछला डेटा और अनुमान',
   'shell.simulations': '{count} सिमुलेशन',
   'shell.details': 'डेटा और मान्यताएँ',
+  'consult.title': 'क्या तेज़ रास्ता चाहिए?',
+  'consult.link': 'मुफ़्त EB-1A / NIW केस समीक्षा',
   'welcome.title': 'ग्रीन कार्ड प्रतीक्षा का अनुमान',
   'welcome.description': 'अपनी श्रेणी और जन्म का देश चुनें, प्राथमिकता तिथि दर्ज करें और अनुमान लगाएँ कि ग्रीन कार्ड के लिए आपकी बारी लगभग कब आएगी (EB-1 ~ EB-5)।',
   'welcome.start': 'अनुमान शुरू करें',
