@@ -12,6 +12,8 @@ module.exports = defineConfig({
     baseURL: 'http://127.0.0.1:4173/site/',
     browserName: 'chromium',
     timezoneId: 'UTC',
+    // 未支持语言回退英文；其余回归以中文浏览器为基线，语言匹配用例自行覆盖 navigator。
+    locale: 'zh-CN',
     reducedMotion: 'reduce',
     viewport: { width: 390, height: 844 },
     trace: 'retain-on-failure',

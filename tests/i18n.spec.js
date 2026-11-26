@@ -3,7 +3,7 @@ const { resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { execFileSync } = require('node:child_process')
 
-const locales = ['zh-CN', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
+const locales = ['zh-CN', 'en', 'hi', 'es', 'pt-BR', 'ja', 'ko', 'ar', 'de', 'fr', 'it']
 const profile = {
   pd: Date.UTC(2026, 0, 15), category: 'EB-1A', country: 'CN', path: 'AOS', family: 0, chartType: 'A'
 }
@@ -83,7 +83,7 @@ async function hoverForecast(page) {
   await expect(page.locator('#chart-tooltip')).toBeVisible()
 }
 
-test('all ten bundled catalogs have the same complete keys and interpolation contracts', async () => {
+test('all eleven bundled catalogs have the same complete keys and interpolation contracts', async () => {
   const { catalogs, languages, availableLanguages, validateCatalog, t } = await import(pathToFileURL(resolve('src/i18n.js')).href)
   expect(languages.map(language => language.id)).toEqual(locales)
   expect(availableLanguages().map(language => language.id)).toEqual(locales)
@@ -141,7 +141,7 @@ for (const locale of locales) {
     await expectFooterAttribution(page, locale)
     await expect(page.locator('html')).toHaveAttribute('lang', locale)
     await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr')
-    await expect(page.locator('#language-select option')).toHaveCount(10)
+    await expect(page.locator('#language-select option')).toHaveCount(locales.length)
     await expect(page.locator('#share-btn')).toHaveAccessibleName(messages['action.share'])
     await expect(page.locator('#refresh-btn')).toHaveAttribute('title', messages['action.refreshTitle'])
     await expect(page.locator('#pe-pd-y')).toHaveAttribute('aria-label', messages['profile.editYearLabel'])
@@ -316,7 +316,7 @@ test('a saved locale localizes the welcome and unconfigured background without g
   }
 })
 
-test('unknown saved language safely defaults to Chinese and a manual choice persists', async ({ page }) => {
+test('unknown saved language safely falls back to the browser language and a manual choice persists', async ({ page }) => {
   await openSaved(page, 'not-a-language')
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN')
   const stored = await page.evaluate(() => localStorage.getItem('eb1a_user_profile'))
@@ -529,7 +529,7 @@ test('single HTML includes all languages and can switch them completely offline'
     const messages = await catalog(locale)
     await expectFooterAttribution(page, locale)
     await expect(page.locator('#share-btn')).toHaveAccessibleName(messages['action.share'])
-    await expect(page.locator('#language-select option')).toHaveCount(10)
+    await expect(page.locator('#language-select option')).toHaveCount(locales.length)
     const notice = await page.evaluate(() => GCI18n.text('offline.notice', { month: GCI18n.formatMonth(VB_YEAR, VB_MON) }))
     await expect(page.locator('.footer')).toContainText(notice)
     await expect(page.locator('#ab-status .ab-pred')).toHaveCount(2)

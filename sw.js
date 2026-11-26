@@ -35,6 +35,13 @@ self.addEventListener('fetch', function (e) {
   // 裸 fetch(req) 会命中浏览器 HTTP 缓存，新排期上线后最长 10 分钟(PWA 场景更久)
   // 仍显示旧数据。用 req.url 重新发起(navigation Request 不能直接带 init 重构)。
   var isHTML = req.mode === 'navigate' || accept.indexOf('text/html') !== -1;
+  // 只有首页是应用外壳。/visa-bulletin/ 等静态排期页走网络、不写缓存，免得覆盖缓存里的应用。
+  var scope = new URL('./', self.location).pathname;
+  var path = new URL(req.url).pathname;
+  if (isHTML && path !== scope && path !== scope + 'index.html') {
+    e.respondWith(fetch(req).catch(function () { return caches.match('./index.html'); }));
+    return;
+  }
   if (isHTML || req.destination === 'script' || req.destination === 'style') {
     e.respondWith(
       fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(function (r) {
