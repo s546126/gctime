@@ -26,6 +26,10 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 
 “分享链接”包含类别、出生国、优先日、速度、情景、供给、参数和界面语言，放在 URL `#` 片段内，不随 HTTP 请求发送。旧链接的 `view=A/B` 仍可打开，但两表始终同时展示，新链接不再携带选表参数。链接接收者先进入共享预览，不覆盖其已保存条件；点击“更新预测”才保存。“修改条件”打开或聚焦条件表单；“重新加载”重载当前发布版本，不主动抓取官方公告，保留档案但重置未保存的高级参数。
 
+## 排期静态页（SEO）
+
+`scripts/build_seo.py` 为 11 种界面语言各生成一个总表页和 25 个类别 × 国家页（EB-1…EB-5 × china、india、row、mexico、philippines），文案在 `scripts/seo_locales.py`，术语沿用 `src/locales/*.js`。URL 规则：英文 `/visa-bulletin/` 与 `/visa-bulletin/eb-2-china/`；其他语言 `/<前缀>/visa-bulletin/` 与 `/<前缀>/eb-2-china/`，前缀为 `zh`、`hi`、`es`、`pt-br`、`ja`、`ko`、`ar`、`de`、`fr`、`it`。每页带全部语言版本的 hreflang（x-default 为英文）和语言切换菜单，`sitemap.xml` 同样列出 `xhtml:link` 互链；`feed.xml` 只有英文。免费评估页只有 `/consult/` 和 `/zh/consult/`，其他语言链接到英文表单。阿拉伯语页为 `dir="rtl"`。
+
 ## 自愿赞助与隐私
 
 在线页面底部有一条固定的自愿赞助横幅，里面直接展示 Adsterra 横幅广告，不再打开 Direct Link，也不会自动跳转。视口宽度大于等于 768 像素时只用 728×90（`https://bauval.org/22/6d1946abad3d3fdcc79373556a137876`），更窄时只用 320×50（`https://bauval.org/22/d450c9cf5ef416c8ffc1907634e0d6e6`）；每次页面只注入一个单元。横幅在进入页面约 1 秒后出现，广告位按创意高度预留，工作区高度会减去整条横幅（含底部安全区）。可以关闭；关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。广告脚本若被拦截或约 4 秒内没有出现 iframe，横幅会收起，不留空条。它不解锁任何功能。仅 `bracketboss2026.com`、`www.bracketboss2026.com` 和 `gc.bracketboss2026.com` 的 HTTPS 在线页面启用，预览、GitHub Pages、本地和单文件离线版不展示。
