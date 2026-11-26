@@ -12,7 +12,8 @@ const test = base.extend({
   }
 })
 
-const MONTHLY = JSON.parse(readFileSync(resolve(__dirname, '../data/visa_bulletin_history.json'), 'utf8')).monthly
+const HISTORY = JSON.parse(readFileSync(resolve(__dirname, '../data/visa_bulletin_history.json'), 'utf8'))
+const MONTHLY = HISTORY.monthly
 const DAY = 86400000
 const MONTH = 31 * DAY
 
@@ -94,7 +95,10 @@ for (const [category, country, cell, pd] of [
 }
 
 test('a priority date equal to the cutoff is not current yet', async ({ page }) => {
-  const cutoff = Date.UTC(2022, 0, 22)   // 2026-11 EB-3 中国表A
+  // 取最新一期 EB-3 中国表A，不写死日期：新公告上线后测试仍然成立
+  const raw = MONTHLY['EB-3|CN|A'][HISTORY.last_bulletin]
+  test.skip(['C', 'U'].includes(raw), '最新一期 EB-3 中国表A 不是日期')
+  const cutoff = new Date(raw).getTime()
   await openCell(page, { pd: cutoff, category: 'EB-3', country: 'CN' })
   const result = await page.evaluate(cutoff => ({
     cutoff: getCurrentCutoff(),

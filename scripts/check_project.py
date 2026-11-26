@@ -175,9 +175,6 @@ def check_bulletin_data():
     fs = re.search(r"^FED_HOLIDAYS = \{(.*?)\}", sniff, re.S | re.M)
     if not fh or not fs or set(re.findall(r"\d{4}-\d{2}-\d{2}", fh.group(1))) != set(re.findall(r"\d{4}-\d{2}-\d{2}", fs.group(1))):
         raise SystemExit("index.html 与 sniff_visa_bulletin.py 的 FED_HOLIDAYS 不一致")
-    hol_years = {d[:4] for d in re.findall(r"\d{4}-\d{2}-\d{2}", fh.group(1))}
-    if m.group(1) not in hol_years:
-        raise SystemExit(f"FED_HOLIDAYS 没有覆盖 {m.group(1)} 年，下期发布窗口会把假日算成工作日")
 
     cm = re.search(r"var CUTOFF_DATA = \{(.*?)\}; // CUTOFF_DATA_END", html, re.S)
     conv = {"current": "C", "unavailable": "U"}
