@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': '表 B · 申請書提出：実績と予測',
   'shell.simulations': '{count} 回のシミュレーション',
   'shell.details': 'データと仮定',
+  'consult.title': 'もっと早いルートを探しますか？',
+  'consult.link': 'EB-1A / NIW の無料ケース診断',
   'welcome.title': 'グリーンカード待機期間予測',
   'welcome.description': '区分と出生国を選び、優先日を入力すると、グリーンカードの順番が来る時期を推計します（EB-1 ~ EB-5）。',
   'welcome.start': '予測を開始',

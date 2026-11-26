@@ -29,13 +29,15 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   // 只处理本站资源。跨源广告脚本不拦截、不预缓存，避免把广告响应写进本站缓存。
   if (new URL(req.url).origin !== self.location.origin) return;
+  // /api/*（免费评估表单）永远直连网络，不缓存、不回退应用外壳。
+  if (new URL(req.url).pathname.indexOf('/api/') === 0) return;
   var accept = req.headers.get('accept') || '';
   // 导航 / HTML：网络优先，离线回退缓存。
   // cache:'no-cache' 强制向服务器 revalidate——GitHub Pages 响应带 max-age=600，
   // 裸 fetch(req) 会命中浏览器 HTTP 缓存，新排期上线后最长 10 分钟(PWA 场景更久)
   // 仍显示旧数据。用 req.url 重新发起(navigation Request 不能直接带 init 重构)。
   var isHTML = req.mode === 'navigate' || accept.indexOf('text/html') !== -1;
-  // 只有首页是应用外壳。/visa-bulletin/ 等静态排期页走网络、不写缓存，免得覆盖缓存里的应用。
+  // 只有首页是应用外壳。/visa-bulletin/、/consult/ 等静态页走网络、不写缓存，免得覆盖缓存里的应用。
   var scope = new URL('./', self.location).pathname;
   var path = new URL(req.url).pathname;
   if (isHTML && path !== scope && path !== scope + 'index.html') {

@@ -58,6 +58,9 @@ TEXT = {
         "other": "Other categories and countries", "updated": "Data updated through the {month} Visa Bulletin.",
         "disclaimer": "Not legal advice. Dates are copied from the official Visa Bulletin; forecasts are estimates.",
         "all": "All categories", "feed": "Visa Bulletin updates",
+        "consult_path": "/consult/", "consult_cta": "Want a faster route? Free EB-1A / NIW case review",
+        "consult_cta_note": "Waiting in EB-2 or EB-3? See whether a self-petitioned EB-1A or NIW could be faster than your current queue. No outcome is promised.",
+        "consult_cta_link": "Request a free review",
     },
     "zh": {
         "lang": "zh-CN", "hub_path": "/zh/visa-bulletin/", "current": "C（无排期）", "unavailable": "U（不可用）",
@@ -82,6 +85,9 @@ TEXT = {
         "other": "其他类别", "updated": "数据已更新至 {month} 签证公告。",
         "disclaimer": "不构成法律意见。日期摘自官方签证公告，预测仅为估算。",
         "all": "全部类别", "feed": "排期更新订阅",
+        "consult_path": "/zh/consult/", "consult_cta": "想走更快的路？免费 EB-1A / NIW 个案评估",
+        "consult_cta_note": "正在排 EB-2 或 EB-3？看看自主申请的 EB-1A 或 NIW 是否可能比现在的队列更快。不承诺任何结果。",
+        "consult_cta_link": "申请免费评估",
     },
 }
 
@@ -147,11 +153,22 @@ header.site a{color:var(--ink);font-weight:700;text-decoration:none}nav.lang a{m
 h1{font-size:1.75rem;line-height:1.25;margin:.3em 0 .2em}h2{font-size:1.2rem;margin:1.6em 0 .5em}p{margin:.5em 0}.muted{color:var(--muted);font-size:.92rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .card b{display:block;font-size:1.45rem;margin-top:2px}.card span{color:var(--muted);font-size:.9rem}
+.consult-cta{margin:24px 0;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-inline-start:4px solid var(--accent);border-radius:12px}
+.consult-cta h2{margin:0 0 .3em;font-size:1.05rem}.consult-cta p{margin:0 0 .4em}.consult-cta a{display:inline-flex;align-items:center;min-height:44px;color:var(--accent);font-weight:700}
 .cta{display:inline-block;margin:18px 0 4px;padding:12px 18px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;min-height:44px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-variant-numeric:tabular-nums}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}th{background:#eef3f0;font-size:.9rem}
 .links{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.links a{display:inline-block;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);text-decoration:none;font-size:.92rem}
 details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0}summary{font-weight:700;cursor:pointer}
+.consult-form{display:grid;gap:6px;max-width:560px}.consult-form[hidden]{display:none}.consult-form label{font-weight:600;margin-top:8px}
+.consult-form input,.consult-form select,.consult-form textarea{font:inherit;font-size:16px;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%}
+.consult-form input:focus-visible,.consult-form select:focus-visible,.consult-form textarea:focus-visible,.consult-form button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.consult-form .consent{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-top:14px}.consult-form .consent input{width:22px;min-height:22px;height:22px;flex:none;margin-top:2px}
+.consult-form button{margin-top:14px;min-height:44px;padding:10px 18px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer;justify-self:start}
+.consult-form button:active{transform:scale(.97)}.consult-form button:disabled{opacity:.6;cursor:progress}
+.consult-form .muted{margin:0}.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.consult-status{min-height:1.6em;font-weight:600}.consult-status:empty{display:none}.privacy{padding-inline-start:1.2em;color:var(--muted);font-size:.92rem}
+@media (prefers-reduced-motion:reduce){.consult-form button:active{transform:none}}
 footer{max-width:880px;margin:0 auto;padding:0 18px 40px;color:var(--muted);font-size:.85rem}
 #gc-sponsor-slot{--gc-ad-width:320px;--gc-ad-height:50px}#gc-sponsor-slot[data-unit=desktop]{--gc-ad-width:728px;--gc-ad-height:90px}#gc-sponsor-slot[hidden]{display:none}
 #gc-sponsor-slot:not([hidden]){position:fixed;z-index:15;inset-inline:0;bottom:0;background:#17271f;color:#f2f6f3;border-top:3px solid #e2c065;padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
@@ -173,7 +190,7 @@ def sponsor_bits(lang, sponsor_src, catalogs):
             f'<script src="{sponsor_src}" defer></script>\n')
 
 
-def layout(lang, title, desc, path, body, jsonld, alternates, sponsor):
+def layout(lang, title, desc, path, body, jsonld, alternates, sponsor, other_path=None):
     t = TEXT[lang]
     alt = "".join(f'<link rel="alternate" hreflang="{esc(h)}" href="{ORIGIN}{esc(p)}">\n' for h, p in alternates)
     other = TEXT["zh" if lang == "en" else "en"]
@@ -197,7 +214,7 @@ def layout(lang, title, desc, path, body, jsonld, alternates, sponsor):
 <script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>
 </head>
 <body>
-<header class="site"><a href="/">{NAME}</a><nav class="lang"><a href="{t['hub_path']}">{esc(t['all'])}</a><a href="{other['hub_path']}" hreflang="{other['lang']}">{'中文' if lang == 'en' else 'English'}</a></nav></header>
+<header class="site"><a href="/">{NAME}</a><nav class="lang"><a href="{t['hub_path']}">{esc(t['all'])}</a><a href="{other_path or other['hub_path']}" hreflang="{other['lang']}">{'中文' if lang == 'en' else 'English'}</a></nav></header>
 <main>
 {body}
 </main>
@@ -214,6 +231,12 @@ def faq_block(t):
     ld = {"@type": "FAQPage", "mainEntity": [
         {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in items]}
     return body, ld
+
+
+def consult_block(t):
+    """Quiet link from every bulletin page to the free case review form."""
+    return (f'<section class="consult-cta"><h2>{esc(t["consult_cta"])}</h2><p class="muted">{esc(t["consult_cta_note"])}</p>'
+            f'<a href="{t["consult_path"]}">{esc(t["consult_cta_link"])} →</a></section>')
 
 
 def build_page(lang, cat, country, monthly, sponsor):
@@ -251,7 +274,7 @@ def build_page(lang, cat, country, monthly, sponsor):
     body = (f"<h1>{esc(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
             f'<p class="muted">{esc(t["latest"].format(month=month_label(last, lang)))}</p>{cards}'
             f'<a class="cta" href="/">{esc(t["cta"])}</a><p class="muted">{esc(t["cta_note"])}</p>'
-            f"{table}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
+            f"{table}{consult_block(t)}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
             f'<p class="muted">{esc(t["updated"].format(month=month_label(last, lang)))}</p>')
     alternates = [("en", page_path("en", cat, country))]
     if country[1] in ZH_COUNTRIES:
@@ -288,13 +311,165 @@ def build_hub(lang, monthly, sponsor):
             f"<h2>{esc(t['all'])}</h2><table><thead><tr><th></th><th>{esc(t['chart_a'])}</th><th>{esc(t['chart_b'])}</th>"
             f"<th>{esc(t['change'])}</th></tr></thead><tbody>{''.join(rows)}</tbody></table>")
     faq, faq_ld = faq_block(t)
-    body += faq
+    body += consult_block(t) + faq
     path = t["hub_path"]
     alternates = [("en", TEXT["en"]["hub_path"]), ("zh-CN", TEXT["zh"]["hub_path"]), ("x-default", TEXT["en"]["hub_path"])]
     jsonld = {"@context": "https://schema.org", "@graph": [
         {"@type": "WebPage", "name": t["hub_title"], "description": t["hub_desc"], "url": ORIGIN + path,
          "inLanguage": t["lang"], "dateModified": latest + "-01"}, faq_ld]}
     return path, latest, layout(lang, t["hub_title"], t["hub_desc"], path, body, jsonld, alternates, sponsor)
+
+
+CONSULT = {
+    "en": {
+        "title": "Free EB-1A / NIW Case Review: Could a Faster Green Card Route Work for You?",
+        "desc": "Free case review for EB-1A, NIW, EB-2, EB-3 and EB-5. See whether EB-1A or NIW could be faster than your current priority date queue. No outcome is promised; not legal advice.",
+        "h1": "Free case review: see whether EB-1A / NIW could be faster than your current queue",
+        "pitch": [
+            "Waiting years in EB-2 or EB-3, especially if you were born in China or India? Some people qualify for a self-petitioned EB-1A or a National Interest Waiver (NIW), which can sometimes mean a shorter wait. Considering EB-5 instead? We can point you to EB-5 agencies too.",
+            "Tell us a little about your case. With your permission, GC Time passes it to independent partner immigration attorneys or EB-5 agencies, who may contact you about a review. GC Time is not a law firm, and no outcome or timeline is promised.",
+        ],
+        "form": "Your case",
+        "name": "Name (optional)", "email": "Email", "contact": "WeChat or phone (optional)",
+        "category": "Category you are working on",
+        "categories": [("EB-1A", "EB-1A (extraordinary ability)"), ("NIW", "NIW (National Interest Waiver)"), ("EB-2", "EB-2 (PERM)"),
+                       ("EB-3", "EB-3"), ("EB-5", "EB-5 (investor)"), ("unsure", "Not sure yet")],
+        "country": "Country of birth",
+        "countries": [("CN", "China (mainland)"), ("IN", "India"), ("ROW", "Another country"), ("MX", "Mexico"), ("PH", "Philippines")],
+        "pd": "Priority date (optional)", "pd_hint": "If you already have one, for example from an approved I-140.",
+        "status": "Current status",
+        "statuses": [("h1b", "In the US on H-1B"), ("f1", "In the US on F-1 / OPT"), ("other_us", "In the US, other status"),
+                     ("outside_us", "Outside the US")],
+        "message": "Anything else (optional, up to 1000 characters)",
+        "message_hint": "For example your field, publications, awards or current employer sponsorship. Please do not include passport or A-numbers.",
+        "consent": "I agree GC Time may share my information with partner immigration attorneys or agencies who may contact me.",
+        "choose": "Choose…", "submit": "Request free review", "sending": "Sending…",
+        "ok": "Thank you. Your request was received. A partner attorney or agency may contact you by email; GC Time itself will not give legal advice.",
+        "errors": {
+            "invalid_email": "Please enter a valid email address.",
+            "consent_required": "Please tick the consent box so we can pass your request on.",
+            "message_too_long": "Please keep the message under 1000 characters.",
+            "invalid_priority_date": "Please enter the priority date as a full date, or leave it empty.",
+            "rate_limited": "Too many requests from this network today. Please try again tomorrow.",
+            "generic": "Something went wrong. Please check the fields and try again.",
+            "offline": "This copy of the site cannot receive the form. Please submit it on the main site:",
+        },
+        "privacy_title": "Privacy",
+        "privacy": [
+            "What we collect: the fields above, the page language, the page you came from, the time, and a one-way hash of your IP address that is only used to limit spam. Your IP address itself is not stored. This page has no ads or tracking scripts.",
+            "Why: only to pass your request to partner immigration attorneys or EB-5 agencies who may contact you, and only with your consent above.",
+            "Deletion: submit this form again with the same email and write “delete my data” in the message, or open an issue in the GitHub repository github.com/s546126/gctime (issues are public, so do not post personal details there). We will delete your record.",
+            "Not legal advice: GC Time is an independent tool, not a law firm. Nothing here is legal advice, and no approval, timeline or result is promised.",
+        ],
+    },
+    "zh": {
+        "title": "免费 EB-1A / NIW 个案评估：有没有更快的绿卡路线",
+        "desc": "EB-1A、NIW、EB-2、EB-3、EB-5 免费个案评估：看看 EB-1A 或 NIW 是否可能比你现在的排期更快。不承诺结果，不构成法律意见。",
+        "h1": "免费个案评估：看看 EB-1A / NIW 是否可能比你现在的队列更快",
+        "pitch": [
+            "在 EB-2 或 EB-3 排了好几年，尤其是中国大陆或印度出生？有些人符合自主申请的 EB-1A 或国家利益豁免（NIW），有时能缩短等待。也在考虑 EB-5？我们同样可以帮你对接 EB-5 机构。",
+            "简单介绍一下你的情况。经你同意后，GC Time 会把信息转给独立的合作移民律师或 EB-5 机构，由他们联系你做评估。GC Time 不是律所，不承诺任何结果或时间。",
+        ],
+        "form": "你的情况",
+        "name": "称呼（选填）", "email": "邮箱", "contact": "微信或电话（选填）",
+        "category": "正在办理或考虑的类别",
+        "categories": [("EB-1A", "EB-1A 杰出人才"), ("NIW", "NIW 国家利益豁免"), ("EB-2", "EB-2（PERM）"),
+                       ("EB-3", "EB-3"), ("EB-5", "EB-5 投资移民"), ("unsure", "还不确定")],
+        "country": "出生国",
+        "countries": [("CN", "中国大陆"), ("IN", "印度"), ("ROW", "其他国家"), ("MX", "墨西哥"), ("PH", "菲律宾")],
+        "pd": "优先日（选填）", "pd_hint": "已有优先日的话填写，例如 I-140 批准通知上的日期。",
+        "status": "当前身份",
+        "statuses": [("h1b", "在美国，H-1B"), ("f1", "在美国，F-1 / OPT"), ("other_us", "在美国，其他身份"), ("outside_us", "不在美国")],
+        "message": "补充说明（选填，最多 1000 字）",
+        "message_hint": "例如研究领域、论文、获奖或雇主担保情况。请不要填写护照号或 A 号码。",
+        "consent": "我同意 GC Time 将我的信息提供给合作的移民律师或机构，他们可能会联系我。",
+        "choose": "请选择…", "submit": "申请免费评估", "sending": "正在提交…",
+        "ok": "谢谢，已收到你的申请。合作律师或机构可能会通过邮箱联系你；GC Time 本身不提供法律意见。",
+        "errors": {
+            "invalid_email": "请填写有效的邮箱地址。",
+            "consent_required": "请勾选同意，我们才能转交你的申请。",
+            "message_too_long": "补充说明请控制在 1000 字以内。",
+            "invalid_priority_date": "优先日请填写完整日期，或留空。",
+            "rate_limited": "该网络今天提交次数过多，请明天再试。",
+            "generic": "提交失败，请检查各项后重试。",
+            "offline": "当前站点副本无法接收表单，请到主站提交：",
+        },
+        "privacy_title": "隐私说明",
+        "privacy": [
+            "收集内容：上面填写的各项、页面语言、来源页面、提交时间，以及 IP 地址的单向哈希（仅用于限制垃圾提交，不保存 IP 本身）。本页没有广告或追踪脚本。",
+            "用途：仅在你同意的前提下，把申请转给可能联系你的合作移民律师或 EB-5 机构。",
+            "删除：用同一邮箱再提交一次，并在补充说明里写“删除我的数据”；或在 GitHub 仓库 github.com/s546126/gctime 提 issue（issue 是公开的，请不要写个人信息）。我们会删除你的记录。",
+            "不构成法律意见：GC Time 是独立工具，不是律所。本页内容不构成法律意见，也不承诺任何批准、时间或结果。",
+        ],
+    },
+}
+
+# 表单脚本：POST 到站点根的 /api/lead（GitHub Pages 镜像没有 Functions，失败时提示去主站）。
+CONSULT_SCRIPT = r"""(function(){
+var M=__MESSAGES__,form=document.getElementById('consult-form'),out=document.getElementById('consult-status'),btn=form.querySelector('button[type=submit]');
+function say(text,link){out.textContent=text;if(link){out.appendChild(document.createTextNode(' '));var a=document.createElement('a');a.href=link;a.textContent=link;out.appendChild(a);}}
+function source(){try{var r=document.referrer&&new URL(document.referrer);if(r&&r.origin===location.origin)return r.pathname;}catch(e){}return location.pathname;}
+function locale(){var q=new URLSearchParams(location.search).get('lang');return q&&/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(q)?q:document.documentElement.lang;}
+form.addEventListener('submit',function(e){
+e.preventDefault();if(btn.disabled)return;
+var f=form.elements,body={name:f.name.value,email:f.email.value,contact:f.contact.value,category:f.category.value,country:f.country.value,
+priority_date:f.priority_date.value,status:f.status.value,message:f.message.value,consent:f.consent.checked,website:f.website.value,
+locale:locale(),source:source()};
+btn.disabled=true;btn.textContent=M.sending;say('');
+fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'omit'})
+.then(function(r){var type=r.headers.get('content-type')||'';if(type.indexOf('application/json')<0)throw new Error('offline');return r.json();})
+.then(function(d){if(d&&d.ok){form.hidden=true;say(M.ok);out.focus();return;}say(M.errors[d&&d.error]||M.errors.generic);})
+.catch(function(){say(M.errors.offline,M.home);})
+.then(function(){btn.disabled=false;btn.textContent=M.submit;});
+});
+})();"""
+
+
+def consult_page(lang, latest):
+    t, c = TEXT[lang], CONSULT[lang]
+    path = t["consult_path"]
+
+    def select(name, label, options):
+        opts = f'<option value="">{esc(c["choose"])}</option>' + "".join(
+            f'<option value="{esc(v)}">{esc(text)}</option>' for v, text in options)
+        return (f'<label for="f-{name}">{esc(label)}</label>'
+                f'<select id="f-{name}" name="{name}" required>{opts}</select>')
+
+    fields = (
+        f'<label for="f-name">{esc(c["name"])}</label><input id="f-name" name="name" maxlength="100" autocomplete="name">'
+        f'<label for="f-email">{esc(c["email"])}</label><input id="f-email" name="email" type="email" maxlength="254" autocomplete="email" required>'
+        f'<label for="f-contact">{esc(c["contact"])}</label><input id="f-contact" name="contact" maxlength="100" autocomplete="tel">'
+        + select("category", c["category"], c["categories"])
+        + select("country", c["country"], c["countries"])
+        + f'<label for="f-pd">{esc(c["pd"])}</label><input id="f-pd" name="priority_date" type="date" min="1990-01-01" max="2100-12-31" aria-describedby="f-pd-hint">'
+        f'<p class="muted" id="f-pd-hint">{esc(c["pd_hint"])}</p>'
+        + select("status", c["status"], c["statuses"])
+        + f'<label for="f-message">{esc(c["message"])}</label><textarea id="f-message" name="message" rows="4" maxlength="1000" aria-describedby="f-message-hint"></textarea>'
+        f'<p class="muted" id="f-message-hint">{esc(c["message_hint"])}</p>'
+        # 蜜罐：视觉和读屏都隐藏，键盘跳过；真人不会填。
+        '<div class="hp" aria-hidden="true"><label for="f-website">Website</label>'
+        '<input id="f-website" name="website" tabindex="-1" autocomplete="off"></div>'
+        f'<label class="consent"><input type="checkbox" name="consent" value="1" required><span>{esc(c["consent"])}</span></label>'
+        f'<button type="submit">{esc(c["submit"])}</button>'
+    )
+    messages = {"ok": c["ok"], "errors": c["errors"], "sending": c["sending"], "submit": c["submit"],
+                "home": ORIGIN + path}
+    script = CONSULT_SCRIPT.replace("__MESSAGES__", json.dumps(messages, ensure_ascii=False).replace("</", "<\\/"))
+    privacy = "".join(f"<li>{esc(item)}</li>" for item in c["privacy"])
+    body = (f"<h1>{esc(c['h1'])}</h1>" + "".join(f"<p>{esc(x)}</p>" for x in c["pitch"])
+            + f'<h2>{esc(c["form"])}</h2><form id="consult-form" class="consult-form">{fields}</form>'
+            f'<p id="consult-status" class="consult-status" role="status" aria-live="polite" tabindex="-1"></p>'
+            f'<h2>{esc(c["privacy_title"])}</h2><ul class="privacy">{privacy}</ul>'
+            f"<script>{script}</script>")
+    alternates = [("en", CONSULT_PATHS["en"]), ("zh-CN", CONSULT_PATHS["zh"]), ("x-default", CONSULT_PATHS["en"])]
+    jsonld = {"@context": "https://schema.org", "@type": "WebPage", "name": c["title"], "description": c["desc"],
+              "url": ORIGIN + path, "inLanguage": t["lang"]}
+    # 收集联系方式的页面不加载第三方广告脚本。
+    return path, latest, layout(lang, c["title"], c["desc"], path, body, jsonld, alternates, "",
+                  other_path=CONSULT_PATHS["zh" if lang == "en" else "en"])
+
+
+CONSULT_PATHS = {"en": TEXT["en"]["consult_path"], "zh": TEXT["zh"]["consult_path"]}
 
 
 def feed(monthly, latest):
@@ -375,6 +550,12 @@ def build(site, sponsor_src=None, catalogs=None):
             target.write_text(text, encoding="utf-8")
             pages.append((path, month))
             latest = max(latest, month)
+    for lang in ("en", "zh"):
+        path, month, text = consult_page(lang, latest)
+        target = site / path.strip("/") / "index.html"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        pages.append((path, month))
     urls = [("/", latest)] + pages
     (site / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

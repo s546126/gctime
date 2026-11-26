@@ -34,6 +34,28 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 
 广告平台对新站点内容／实际域名的批准、投放可用性及收入须由账户所有者在 Adsterra 后台核验；代码上线不等于已获平台批准。测试只使用拦截的广告目标，不点击真实广告。域名切换及回滚见 [运维说明](docs/domain-migration.md)。不同域名的浏览器存储相互独立；不强制跳转或清除档案，可用现有分享链接在地址之间转移条件。
 
+## 免费个案评估（线索表单）
+
+`/consult/`（英文）和 `/zh/consult/`（中文）是由 `scripts/build_seo.py` 生成的静态页：简短说明 EB-1A / NIW 可能比现有队列更快、一张表单和隐私说明。表单提交到 Cloudflare Pages Function `POST /api/lead`（`functions/api/lead.js`），写入 D1 数据库 `gctime-leads`（Pages 生产环境绑定名 `LEADS`）。站主之后会把合格线索转介给合作移民律师和 EB-5 机构；页面不承诺任何结果，也不构成法律意见。
+
+- 字段：称呼（选填）、邮箱（必填）、微信或电话（选填）、类别（EB-1A / NIW / EB-2 / EB-3 / EB-5 / 不确定）、出生国（CN/IN/ROW/MX/PH）、优先日（选填）、当前身份（H-1B / F-1 / 其他在美身份 / 不在美国）、补充说明（≤1000 字）、页面语言、来源页、提交时间和必填的同意勾选。表结构见 `scripts/leads_schema.sql`。
+- 防滥用：服务端逐项校验；隐藏的 `website` 蜜罐字段有值时返回 `{ok:true}` 但不写库；同一 IP 滚动 24 小时最多 5 条成功提交，超出返回 429；请求体上限 8 KB；只接受 `application/json`，带 `Origin` 时只认本站域名。只保存 `HMAC-SHA256(LEAD_SALT, IP)`，不存原始 IP；`LEAD_SALT` 是 Pages 生产环境 secret。返回 `{ok:true}` 或 `{error:"..."}`。不调用第三方服务。
+- 表单页不加载赞助广告脚本。应用内在预测结果下方有一行安静的入口（11 种语言），排期落地页和两个汇总页各有一个入口块；Service Worker 不拦截 `/api/*`，也不把评估页当作应用外壳缓存。
+- GitHub Pages 镜像和本地静态服务器没有 Functions，提交时提示到主站 `https://bracketboss2026.com/consult/` 提交。
+- 删除请求：用户可用同一邮箱再提交一次并在说明里写明，或在 GitHub 提 issue。
+
+读取线索（需要本机 `npx wrangler login`）：
+
+```bash
+bash scripts/leads.sh              # 最近 50 条
+bash scripts/leads.sh --days 7     # 最近 7 天
+bash scripts/leads.sh --count      # 按类别 / 出生国统计
+bash scripts/leads.sh --json 500 > leads.json
+bash scripts/leads.sh --delete 42  # 删除指定 id
+```
+
+一次性配置（已完成，重建时参考）：`npx wrangler d1 create gctime-leads`，`npx wrangler d1 execute gctime-leads --remote --file scripts/leads_schema.sql`，在 Pages 项目 `gctime` 的生产环境绑定 D1 `LEADS`（Pages API `deployment_configs.production.d1_databases` 或 dashboard），`npx wrangler pages secret put LEAD_SALT --project-name gctime`。仓库刻意不放 `wrangler.toml`：Pages 项目一旦读取它，会以文件为准覆盖 dashboard 上的绑定。
+
 ## 方法
 
 工具不直接外推 cutoff 时间序列，而是还原签证分配的底层过程：
@@ -156,6 +178,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 `npm run build:ui` 把 `src/shell.jsx` 和 `src/styles.css` 编译为忽略提交的 `assets/ui.js`、`assets/ui.css`，不拆分 chunk、不生成 source map。`npm run build` 继续生成 `dist/site/`、`dist/EB1A.html` 和 `dist/EB1A-offline.zip`；直接运行 `python3 scripts/build_site.py` 也会先编译 UI。
 
 `src/sponsor.js` 由在线构建单独复制、指纹化并注入页面底部（固定在视口底边，不进入页脚文档流），不进入通用 UI bundle 或离线 HTML。其内容参与 worker 版本摘要，但不作为 worker 安装所需的预缓存依赖；广告文件不可用不会阻塞预测。展示延迟 `SHOW_DELAY_MS`、关闭隐藏时长 `DISMISS_MS` 和广告加载超时 `AD_LOAD_TIMEOUT_MS` 写在该文件顶部。
+
+Cloudflare 发布 job 会单独 sparse checkout `functions/`，`wrangler pages deploy` 从工作目录编译 Pages Functions；发布后向 `https://gctime.pages.dev/api/lead` POST `{}`，必须得到 JSON 400，否则视为 Functions 未上线而失败。`node --test tests/lead-function.test.mjs` 覆盖表单接口的校验、蜜罐和限流。
 
 `npm test` 自动完整构建，在真实子路径运行浏览器测试；CI 用 `GCTIME_PREBUILT=1` 复用刚验证的产物。离线 HTML 内联 React/HeroUI 的 JS 和 CSS，不需要 CDN 或本地服务器。站点 service worker 预缓存这些资源，并以构建内容指纹更新缓存。当前页面未自动注册 service worker；相关测试主动注册以验证分发的 worker，单 HTML 离线版无需注册。
 

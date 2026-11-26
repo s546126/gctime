@@ -48,6 +48,17 @@ function ThemeToggle() {
   </Button>
 }
 
+// 免费个案评估入口：中文到中文页，其他语言到英文页并带上界面语言。离线单文件没有站点，直接去主站。
+function ConsultLink() {
+  const locale = getLocale()
+  const base = location.protocol === 'file:' ? 'https://bracketboss2026.com/' : './'
+  const href = base + (locale === 'zh-CN' ? 'zh/consult/' : 'consult/?lang=' + encodeURIComponent(locale))
+  return <p className="consult-cta" id="consult-cta">
+    <span>{text('consult.title')}</span>
+    <a href={href}>{text('consult.link')}</a>
+  </p>
+}
+
 function Dashboard({ nodes }) {
   useSyncExternalStore(subscribe, getLocale)
   return <>
@@ -88,7 +99,7 @@ function Dashboard({ nodes }) {
           <div className="forecast-sheet">
           <Widget className="forecast-widget">
             <Widget.Header className="sr-only"><Widget.Title>{text('shell.forecast')}</Widget.Title></Widget.Header>
-            <Widget.Content><LegacySlot node={nodes.result} /></Widget.Content>
+            <Widget.Content><LegacySlot node={nodes.result} /><ConsultLink /></Widget.Content>
           </Widget>
           <Widget className="chart-widget">
             <Widget.Header><div><Widget.Title>{text('shell.chart')}</Widget.Title><EngineText component={Widget.Description} id="chart-description" initialKey="shell.chartDescription" /></div><span className="model-label">{text('shell.simulations', { count: 500 })}</span></Widget.Header>

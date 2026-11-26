@@ -25,6 +25,16 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo '::error::Missing CLOUDFLARE_API_TOKEN'; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo '::error::Missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+      # Pages Functions（/api/lead）不在站点产物里：wrangler 从工作目录的 functions/ 编译。
+      # checkout 会清空工作区，必须放在下载产物之前；只取 functions/，不带根目录 package.json。
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /functions/
+          sparse-checkout-cone-mode: false
+      - name: Require Pages Functions source
+        run: test -f functions/api/lead.js || { echo '::error::functions/api/lead.js missing from checkout'; exit 1; }
       - uses: actions/download-artifact@v4
         with:
           name: site
@@ -58,3 +68,18 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.146.0'
           command: pages deploy _site --project-name=gctime --branch=main --commit-hash=${{ github.sha }}
+      # 如果 functions/ 没有随部署上传，/api/lead 会落到静态站点并返回 405。
+      - name: Verify /api/lead function is live
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -s -o response.json -w '%{http_code}' -X POST https://gctime.pages.dev/api/lead \
+              -H 'Content-Type: application/json' --data '{}') || code=000
+            if [ "$code" = 400 ] && grep -q '"error"' response.json; then
+              echo "/api/lead responded $code: $(cat response.json)"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code"
+            sleep 10
+          done
+          echo '::error::/api/lead did not return the expected JSON validation error; Pages Functions may not be deployed'
+          exit 1

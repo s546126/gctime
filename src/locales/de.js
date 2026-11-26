@@ -33,6 +33,8 @@ export default {
   'shell.chartDescriptionB': 'Tabelle B · Antragseinreichung: Verlauf und Prognose',
   'shell.simulations': '{count} Simulationen',
   'shell.details': 'Daten und Annahmen',
+  'consult.title': 'Gibt es einen schnelleren Weg?',
+  'consult.link': 'Kostenlose EB-1A-/NIW-Fallprüfung',
   'welcome.title': 'Green-Card-Wartezeitprognose',
   'welcome.description': 'Wählen Sie Kategorie und Geburtsland und geben Sie Ihr Prioritätsdatum ein, um die ungefähre Wartezeit zu schätzen (EB-1 bis EB-5).',
   'welcome.start': 'Prognose starten',

@@ -90,6 +90,8 @@ def check_sponsor():
         raise SystemExit("Service Worker 不应预缓存或改写广告脚本")
     if "origin !== self.location.origin" not in worker:
         raise SystemExit("Service Worker 必须放过跨源请求，避免拦截广告脚本")
+    if "indexOf('/api/') === 0) return;" not in worker:
+        raise SystemExit("Service Worker 不能拦截或缓存 /api/*")
     build = (ROOT / "scripts" / "build_site.py").read_text(encoding="utf-8")
     if "footer + '\\n    <div id=\"gc-sponsor-slot\"'" in build:
         raise SystemExit("赞助槽不应再注入页脚")
@@ -195,7 +197,7 @@ def main(source_only=False):
     for path in sorted((ROOT / "scripts").glob("*.sh")):
         subprocess.run(["bash", "-n", str(path)], check=True)
     for path in [*sorted((ROOT / "scripts").glob("*.mjs")), *sorted(ROOT.glob("*.js")),
-                 ROOT / "src" / "sponsor.js"]:
+                 ROOT / "src" / "sponsor.js", *sorted((ROOT / "functions").rglob("*.js"))]:
         subprocess.run(["node", "--check", str(path)], check=True)
     subprocess.run(["node", str(ROOT / "scripts" / "build_ui.mjs"), "--check"], cwd=ROOT, check=True)
     for path in [ROOT / "manifest.json", *sorted((ROOT / "data").glob("*.json"))]:

@@ -35,3 +35,6 @@ assets/ui.css
 dist/
 build/
 *.log
+
+# Wrangler local state
+.wrangler/

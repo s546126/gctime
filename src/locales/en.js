@@ -34,6 +34,8 @@ export default {
   'shell.chartDescriptionB': 'Chart B · Dates for Filing: history and forecast',
   'shell.simulations': '{count} simulations',
   'shell.details': 'Data and assumptions',
+  'consult.title': 'Want a faster route?',
+  'consult.link': 'Free EB-1A / NIW case review',
   'welcome.title': 'Green Card Priority Date Forecast',
   'welcome.description': 'Choose your category and country of birth, enter your priority date, and estimate roughly when your green card will be current (EB-1 to EB-5).',
   'welcome.start': 'Start forecast',
