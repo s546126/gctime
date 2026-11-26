@@ -8,89 +8,44 @@ sitemap.xml, robots.txt and an Atom feed. Every number comes from the bulletin h
 no forecast of their own and send readers to the predictor for that. Online builds add the same
 bottom sponsor banner as the app (src/sponsor.js, which only runs on the production hosts). Online builds
 also load src/analytics.js on every page, including /consult/; it only loads PostHog on the production hosts.
+
+URL scheme (one hub + 25 category × country pages per UI language; strings in seo_locales.py):
+  English   /visa-bulletin/            /visa-bulletin/eb-2-china/     (kept from the first release)
+  other     /<prefix>/visa-bulletin/   /<prefix>/eb-2-china/          prefix = zh, hi, es, pt-br, ja,
+                                                                       ko, ar, de, fr, it
+Slugs are eb-1..eb-5 × china, india, row, mexico, philippines. The free case review exists only at
+/consult/ and /zh/consult/; other languages link to the English form. Every page lists all language
+versions of itself as hreflang alternates (plus x-default = English), and so does sitemap.xml.
 """
 
 import html
 import json
+import re
 from datetime import date
 from pathlib import Path
+
+from seo_locales import ORDER, TEXT
 
 ROOT = Path(__file__).resolve().parent.parent
 ORIGIN = "https://bracketboss2026.com"
 NAME = "GC Time"
 
-CATEGORIES = [  # (page slug, data key, English name, Chinese name)
+CATEGORIES = [  # (page slug, data key, English name, Chinese name); names per locale in TEXT[...]["cats"]
     ("eb-1", "EB-1A", "EB-1", "EB-1 杰出人才"),
     ("eb-2", "EB-2", "EB-2", "EB-2 高学历 / NIW"),
     ("eb-3", "EB-3", "EB-3", "EB-3 专业人才 / 技术工人"),
     ("eb-4", "EB-4", "EB-4", "EB-4 特殊移民"),
     ("eb-5", "EB-5", "EB-5 (unreserved)", "EB-5 投资移民（非预留）"),
 ]
-COUNTRIES = [  # (slug, data key, English name, Chinese name)
+COUNTRIES = [  # (slug, data key, English name, Chinese name); names per locale in TEXT[...]["countries"]
     ("china", "CN", "China (mainland-born)", "中国大陆"),
     ("india", "IN", "India", "印度"),
     ("row", "ROW", "Rest of World (All Chargeability)", "其他国家"),
     ("mexico", "MX", "Mexico", "墨西哥"),
     ("philippines", "PH", "Philippines", "菲律宾"),
 ]
-ZH_COUNTRIES = {"CN"}       # Chinese pages only where the Chinese-speaking audience is
-
-TEXT = {
-    "en": {
-        "lang": "en", "hub_path": "/visa-bulletin/", "current": "Current", "unavailable": "Unavailable",
-        "hub_title": "Visa Bulletin Tracker: EB-1 to EB-5 Priority Dates by Country",
-        "hub_desc": "Latest employment-based Visa Bulletin cutoffs (Final Action and Dates for Filing) for EB-1, EB-2, EB-3, EB-4 and EB-5 in China, India, Mexico, the Philippines and the rest of the world, with month-over-month movement.",
-        "page_title": "{cat} {country} Priority Date: Visa Bulletin History and Forecast",
-        "page_desc": "{cat} {country} cutoff in the {month} Visa Bulletin: Final Action {a}, Dates for Filing {b}. Monthly history, 12-month movement and a free tool to estimate when your priority date becomes current.",
-        "h1": "{cat} {country}: Visa Bulletin cutoff dates",
-        "latest": "Latest bulletin: {month}",
-        "chart_a": "Final Action Date (Chart A)", "chart_b": "Dates for Filing (Chart B)",
-        "change": "Change from previous month", "moved": "{days} days forward", "back": "{days} days backward",
-        "same": "No change", "year": "Movement over the last 12 months (Chart A)",
-        "history": "Monthly history", "month": "Bulletin", "cta": "Estimate when your priority date will be current",
-        "cta_note": "The free predictor models visa supply and the queue ahead of your priority date, with optimistic, median and conservative scenarios.",
-        "faq": "Questions",
-        "q1": "What is the difference between Chart A and Chart B?",
-        "a1": "Chart A (Final Action Dates) decides when a green card can be approved. Chart B (Dates for Filing) decides when you may file Form I-485 early, if USCIS says that chart can be used that month. Each month USCIS announces which chart applies to adjustment of status.",
-        "q2": "What does “Current” mean?",
-        "a2": "“C” means there is no backlog: any priority date qualifies that month.",
-        "q3": "Where do these dates come from?",
-        "a3": "From the monthly U.S. Department of State Visa Bulletin, updated automatically after each release. This page does not change official dates; always confirm with the official bulletin and USCIS.",
-        "other": "Other categories and countries", "updated": "Data updated through the {month} Visa Bulletin.",
-        "disclaimer": "Not legal advice. Dates are copied from the official Visa Bulletin; forecasts are estimates.",
-        "all": "All categories", "feed": "Visa Bulletin updates",
-        "consult_path": "/consult/", "consult_cta": "Want a faster route? Free EB-1A / NIW case review",
-        "consult_cta_note": "Waiting in EB-2 or EB-3? See whether a self-petitioned EB-1A or NIW could be faster than your current queue. No outcome is promised.",
-        "consult_cta_link": "Request a free review",
-    },
-    "zh": {
-        "lang": "zh-CN", "hub_path": "/zh/visa-bulletin/", "current": "C（无排期）", "unavailable": "U（不可用）",
-        "hub_title": "美国职业移民排期表：EB-1 至 EB-5 中国排期一览",
-        "hub_desc": "最新签证公告（Visa Bulletin）中国大陆 EB-1、EB-2、EB-3、EB-4、EB-5 的表A（最终裁决）与表B（递交申请）排期，以及每月进退。",
-        "page_title": "{cat}中国排期：签证公告历史与排期预测",
-        "page_desc": "{month} 签证公告 {cat}中国大陆：表A {a}，表B {b}。逐月历史、近 12 个月进度，以及免费的排期到期时间预测工具。",
-        "h1": "{cat}中国大陆：签证公告排期",
-        "latest": "最新公告：{month}",
-        "chart_a": "最终裁决日期（表A）", "chart_b": "递交申请日期（表B）",
-        "change": "较上月", "moved": "前进 {days} 天", "back": "倒退 {days} 天", "same": "不变",
-        "year": "近 12 个月进度（表A）", "history": "逐月历史", "month": "公告月份",
-        "cta": "预测你的优先日什么时候到期",
-        "cta_note": "免费工具按签证供给和你前面的排队人数推算，给出乐观、中位、保守三种情景。",
-        "faq": "常见问题",
-        "q1": "表A 和表B 有什么区别？",
-        "a1": "表A（Final Action Dates）决定绿卡何时可以批准；表B（Dates for Filing）决定何时可以提前递交 I-485，但前提是 USCIS 宣布当月可用表B。每月 USCIS 会公布调整身份用哪张表。",
-        "q2": "“C” 是什么意思？",
-        "a2": "C（Current）表示当月没有排期，任何优先日都可以。",
-        "q3": "数据从哪里来？",
-        "a3": "来自美国国务院每月发布的签证公告，公告发布后自动更新。本页不修改官方日期，请以官方公告和 USCIS 为准。",
-        "other": "其他类别", "updated": "数据已更新至 {month} 签证公告。",
-        "disclaimer": "不构成法律意见。日期摘自官方签证公告，预测仅为估算。",
-        "all": "全部类别", "feed": "排期更新订阅",
-        "consult_path": "/zh/consult/", "consult_cta": "想走更快的路？免费 EB-1A / NIW 个案评估",
-        "consult_cta_note": "正在排 EB-2 或 EB-3？看看自主申请的 EB-1A 或 NIW 是否可能比现在的队列更快。不承诺任何结果。",
-        "consult_cta_link": "申请免费评估",
-    },
-}
+for _lang, _t in TEXT.items():
+    _t["hub_path"] = "/visa-bulletin/" if _lang == "en" else f"/{_lang}/visa-bulletin/"
 
 
 def esc(value):
@@ -99,9 +54,8 @@ def esc(value):
 
 def month_label(month, lang):
     year, mon = map(int, month.split("-"))
-    if lang == "zh":
-        return f"{year} 年 {mon} 月"
-    return date(year, mon, 1).strftime("%B %Y")
+    t = TEXT[lang]
+    return t["month_fmt"].format(y=year, n=mon, m=t["months"][mon - 1])
 
 
 def show(value, t):
@@ -124,7 +78,7 @@ def movement(old, new, t):
         return t["same"]
     days = days_between(old, new)
     if days is None:
-        return f"{show(old, t)} → {show(new, t)}"
+        return f"{show(old, t)} {t['arrow']} {show(new, t)}"
     return t["moved"].format(days=days) if days > 0 else t["back"].format(days=-days)
 
 
@@ -133,24 +87,37 @@ def series(monthly, key, chart):
 
 
 def page_path(lang, cat, country):
-    if lang == "zh":
-        return f"/zh/{cat[0]}-{country[0]}/"
-    return f"/visa-bulletin/{cat[0]}-{country[0]}/"
+    if lang == "en":
+        return f"/visa-bulletin/{cat[0]}-{country[0]}/"
+    return f"/{lang}/{cat[0]}-{country[0]}/"
+
+
+def names(lang, cat, country):
+    t = TEXT[lang]
+    return t["cats"][CATEGORIES.index(cat)], t["countries"][COUNTRIES.index(country)]
 
 
 def page_label(lang, cat, country):
-    return f"{cat[3] if lang == 'zh' else cat[2]} {country[3] if lang == 'zh' else country[2]}"
+    cat_name, country_name = names(lang, cat, country)
+    return TEXT[lang]["label"].format(cat=cat_name, country=country_name)
 
 
-def countries_for(lang):
-    return [c for c in COUNTRIES if lang == "en" or c[1] in ZH_COUNTRIES]
+def alternates(path_for, langs=ORDER):
+    """hreflang alternates for one page: every language version (the page itself included) + x-default.
+    The <link rel=alternate> tags, the language switcher and sitemap.xml all use this list."""
+    alts = [(lang, path_for(lang)) for lang in langs]
+    return alts + [("x-default", path_for("en"))]
 
 
 STYLE = """
 :root{color-scheme:light;--ink:#14211b;--muted:#53625a;--line:#d8e0db;--bg:#f6f8f6;--card:#fff;--accent:#0f6b47}
-*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);padding-bottom:var(--gc-sponsor-reserve,0)}
-main{max-width:880px;margin:0 auto;padding:24px 18px 64px}header.site{max-width:880px;margin:0 auto;padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center}
-header.site a{color:var(--ink);font-weight:700;text-decoration:none}nav.lang a{margin-left:12px;color:var(--muted)}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Noto Sans",sans-serif;color:var(--ink);background:var(--bg);padding-bottom:var(--gc-sponsor-reserve,0);overflow-wrap:break-word}
+main{max-width:880px;margin:0 auto;padding:24px 18px 64px}header.site{max-width:880px;margin:0 auto;padding:14px 18px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 12px;align-items:center}
+header.site a{color:var(--ink);font-weight:700;text-decoration:none}nav.lang{display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap}nav.lang>a{color:var(--muted);font-weight:400;display:inline-flex;align-items:center;min-height:44px}
+.langs{position:relative}.langs summary{list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:.92rem;font-weight:600}
+.langs summary::-webkit-details-marker{display:none}.langs summary::after{content:"▾";color:var(--muted)}
+.langs ul{position:absolute;z-index:20;inset-inline-end:0;top:calc(100% + 4px);margin:0;padding:6px;list-style:none;min-width:180px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px #14211b22}
+.langs li a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;color:var(--ink);font-weight:400}.langs li a:hover,.langs li a:focus-visible{background:#eef3f0}.langs li a[aria-current]{font-weight:700;color:var(--accent)}
 h1{font-size:1.75rem;line-height:1.25;margin:.3em 0 .2em}h2{font-size:1.2rem;margin:1.6em 0 .5em}p{margin:.5em 0}.muted{color:var(--muted);font-size:.92rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .card b{display:block;font-size:1.45rem;margin-top:2px}.card span{color:var(--muted);font-size:.9rem}
@@ -158,9 +125,17 @@ h1{font-size:1.75rem;line-height:1.25;margin:.3em 0 .2em}h2{font-size:1.2rem;mar
 .consult-cta h2{margin:0 0 .3em;font-size:1.05rem}.consult-cta p{margin:0 0 .4em}.consult-cta a{display:inline-flex;align-items:center;min-height:44px;color:var(--accent);font-weight:700}
 .cta{display:inline-block;margin:18px 0 4px;padding:12px 18px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;min-height:44px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-variant-numeric:tabular-nums}
-th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}th{background:#eef3f0;font-size:.9rem}
-.links{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.links a{display:inline-block;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);text-decoration:none;font-size:.92rem}
-details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0}summary{font-weight:700;cursor:pointer}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}th{background:#eef3f0;font-size:.9rem;white-space:nowrap}
+.d,.nb{white-space:nowrap}.legend{margin:.2em 0 .8em}
+@media (max-width:520px){
+th,td{padding:8px 6px;font-size:.9rem}
+table.stack,table.stack tbody{display:block;border:0;background:none}table.stack thead{display:none}
+table.stack tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 10px;margin:0 0 8px;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table.stack td{padding:0;border:0;font-size:.95rem}table.stack td:first-child{grid-column:1/-1;font-weight:700;margin-bottom:4px}table.stack td:first-child a{display:inline-flex;align-items:center;min-height:44px}
+table.stack td[data-label]::before{content:attr(data-label);display:block;color:var(--muted);font-size:.78rem;font-weight:400;white-space:nowrap}
+}
+.links{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}.links a{display:inline-flex;align-items:center;min-height:44px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);text-decoration:none;font-size:.92rem}
+details.faq{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0}details.faq summary{font-weight:700;cursor:pointer}
 .consult-form{display:grid;gap:6px;max-width:560px}.consult-form[hidden]{display:none}.consult-form label{font-weight:600;margin-top:8px}
 .consult-form input,.consult-form select,.consult-form textarea{font:inherit;font-size:16px;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%}
 .consult-form input:focus-visible,.consult-form select:focus-visible,.consult-form textarea:focus-visible,.consult-form button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -181,22 +156,49 @@ footer{max-width:880px;margin:0 auto;padding:0 18px 40px;color:var(--muted);font
 
 
 def sponsor_bits(lang, sponsor_src, catalogs):
-    """The app's banner script with a minimal GCI18n for these static pages."""
+    """The app's banner script with a minimal GCI18n for these static pages (sponsor.* from the page's
+    own locale catalog, English when that catalog is missing)."""
     if not sponsor_src:
         return ""
-    messages = catalogs["en" if lang == "en" and "en" in catalogs else "zh-CN"]
+    messages = catalogs.get(TEXT[lang]["catalog"]) or catalogs.get("en") or {}
     stub = json.dumps({k: v for k, v in messages.items() if k.startswith("sponsor.")}, ensure_ascii=False)
     return ('<div id="gc-sponsor-slot" hidden></div>\n'
             f'<script>window.GCI18n={{text:function(k){{return ({stub})[k]||""}}}};</script>\n'
             f'<script src="{sponsor_src}" defer></script>\n')
 
 
-def layout(lang, title, desc, path, body, jsonld, alternates, sponsor, other_path=None, analytics=""):
+def switcher(lang, alts):
+    """Compact language menu (no script): a <details> listing every language version of this page."""
     t = TEXT[lang]
-    alt = "".join(f'<link rel="alternate" hreflang="{esc(h)}" href="{ORIGIN}{esc(p)}">\n' for h, p in alternates)
-    other = TEXT["zh" if lang == "en" else "en"]
+    items = []
+    for code, path in alts:
+        if code == "x-default":
+            continue
+        other = TEXT[code]
+        attrs = f' hreflang="{other["lang"]}" lang="{other["lang"]}"'
+        attrs += f' dir="{other["dir"]}"' if other["dir"] != t["dir"] else ""
+        attrs += ' aria-current="page"' if code == lang else ""
+        items.append(f'<li><a href="{esc(path)}"{attrs}>{esc(other["name"])}</a></li>')
+    return (f'<details class="langs"><summary aria-label="{esc(t["lang_label"])}: {esc(t["name"])}">'
+            f'<span aria-hidden="true">🌐</span>{esc(t["name"])}</summary><ul>{"".join(items)}</ul></details>')
+
+
+# 匿名统计脚本标签（src/analytics.js）；只有在线构建调用 build(analytics_src=…) 时非空，所有静态页都在 <head> 里加载。
+ANALYTICS_TAG = ""
+
+
+def analytics_tag(analytics_src):
+    """Anonymous usage analytics; the script itself only loads PostHog on the production hosts."""
+    return f'<script src="{esc(analytics_src)}" defer></script>\n' if analytics_src else ""
+
+
+def layout(lang, title, desc, path, body, jsonld, alts, sponsor):
+    """The one place where <head> and the end of <body> are built for every static page."""
+    t = TEXT[lang]
+    alt = "".join(f'<link rel="alternate" hreflang="{esc(TEXT[h]["lang"] if h in TEXT else h)}" href="{ORIGIN}{esc(p)}">\n'
+                  for h, p in alts)
     return f"""<!DOCTYPE html>
-<html lang="{t['lang']}">
+<html lang="{t['lang']}" dir="{t['dir']}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -208,14 +210,15 @@ def layout(lang, title, desc, path, body, jsonld, alternates, sponsor, other_pat
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:url" content="{ORIGIN}{esc(path)}">
+<meta property="og:locale" content="{t['lang'].replace('-', '_')}">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="alternate" type="application/atom+xml" title="{esc(t['feed'])}" href="/feed.xml">
 <style>{STYLE}</style>
 <script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>
-{analytics}</head>
+{ANALYTICS_TAG}</head>
 <body>
-<header class="site"><a href="/">{NAME}</a><nav class="lang"><a href="{t['hub_path']}">{esc(t['all'])}</a><a href="{other_path or other['hub_path']}" hreflang="{other['lang']}">{'中文' if lang == 'en' else 'English'}</a></nav></header>
+<header class="site"><a href="/">{NAME}</a><nav class="lang"><a href="{t['hub_path']}">{esc(t['all'])}</a>{switcher(lang, alts)}</nav></header>
 <main>
 {body}
 </main>
@@ -225,10 +228,15 @@ def layout(lang, title, desc, path, body, jsonld, alternates, sponsor, other_pat
 """
 
 
+def heading(text):
+    """Escaped heading text where "EB-1" … "EB-5" never break at the hyphen on narrow screens."""
+    return re.sub(r"\bEB-\d\b", lambda m: f'<span class="nb">{m.group(0)}</span>', esc(text))
+
+
 def faq_block(t):
     items = [(t["q1"], t["a1"]), (t["q2"], t["a2"]), (t["q3"], t["a3"])]
     body = f"<h2>{esc(t['faq'])}</h2>" + "".join(
-        f"<details><summary>{esc(q)}</summary><p>{esc(a)}</p></details>" for q, a in items)
+        f'<details class="faq"><summary>{esc(q)}</summary><p>{esc(a)}</p></details>' for q, a in items)
     ld = {"@type": "FAQPage", "mainEntity": [
         {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in items]}
     return body, ld
@@ -237,15 +245,10 @@ def faq_block(t):
 def consult_block(t, placement):
     """Quiet link from every bulletin page to the free case review form. placement: landing | hub (analytics)."""
     return (f'<section class="consult-cta"><h2>{esc(t["consult_cta"])}</h2><p class="muted">{esc(t["consult_cta_note"])}</p>'
-            f'<a href="{t["consult_path"]}" data-gc-cta="{placement}">{esc(t["consult_cta_link"])} →</a></section>')
+            f'<a href="{t["consult_path"]}" data-gc-cta="{placement}">{esc(t["consult_cta_link"])} {t["arrow"]}</a></section>')
 
 
-def analytics_tag(analytics_src):
-    """Anonymous usage analytics (src/analytics.js); the script itself only loads PostHog on the production hosts."""
-    return f'<script src="{esc(analytics_src)}" defer></script>\n' if analytics_src else ""
-
-
-def build_page(lang, cat, country, monthly, sponsor, analytics=""):
+def build_page(lang, cat, country, monthly, sponsor):
     t = TEXT[lang]
     key = f"{cat[1]}|{country[1]}"
     a_hist, b_hist = series(monthly, key, "A"), series(monthly, key, "B")
@@ -256,36 +259,33 @@ def build_page(lang, cat, country, monthly, sponsor, analytics=""):
     prev = months[-2] if len(months) > 1 else None
     a, b = a_hist.get(last), b_hist.get(last)
     label = page_label(lang, cat, country)
-    cat_name = cat[3] if lang == "zh" else cat[2]
-    country_name = country[3] if lang == "zh" else country[2]
+    cat_name, country_name = names(lang, cat, country)
     title = t["page_title"].format(cat=cat_name, country=country_name)
     desc = t["page_desc"].format(cat=cat_name, country=country_name, month=month_label(last, lang),
                                  a=show(a, t), b=show(b, t))
     year_ago = next((m for m in reversed(months) if m <= f"{int(last[:4]) - 1}{last[4:]}"), None)
     year_move = movement(a_hist.get(year_ago), a, t) if year_ago and a_hist.get(year_ago) else "—"
     cards = (f'<div class="cards">'
-             f'<div class="card"><span>{esc(t["chart_a"])}</span><b>{esc(show(a, t))}</b>'
+             f'<div class="card"><span>{esc(t["chart_a"])}</span><b class="d">{esc(show(a, t))}</b>'
              f'<span>{esc(t["change"])}: {esc(movement(a_hist.get(prev), a, t) if prev else "—")}</span></div>'
-             f'<div class="card"><span>{esc(t["chart_b"])}</span><b>{esc(show(b, t))}</b>'
+             f'<div class="card"><span>{esc(t["chart_b"])}</span><b class="d">{esc(show(b, t))}</b>'
              f'<span>{esc(t["change"])}: {esc(movement(b_hist.get(prev), b, t) if prev else "—")}</span></div>'
              f'<div class="card"><span>{esc(t["year"])}</span><b>{esc(year_move)}</b></div></div>')
-    rows = "".join(f"<tr><td>{esc(month_label(m, lang))}</td><td>{esc(show(a_hist.get(m), t))}</td>"
-                   f"<td>{esc(show(b_hist.get(m), t))}</td></tr>" for m in reversed(months[-24:]))
-    table = (f"<h2>{esc(t['history'])}</h2><table><thead><tr><th>{esc(t['month'])}</th><th>{esc(t['chart_a'])}</th>"
-             f"<th>{esc(t['chart_b'])}</th></tr></thead><tbody>{rows}</tbody></table>")
+    rows = "".join(f'<tr><td>{esc(month_label(m, lang))}</td><td class="d">{esc(show(a_hist.get(m), t))}</td>'
+                   f'<td class="d">{esc(show(b_hist.get(m), t))}</td></tr>' for m in reversed(months[-24:]))
+    table = (f"<h2>{esc(t['history'])}</h2><p class=\"muted legend\">{esc(t['legend'])}</p>"
+             f"<table><thead><tr><th>{esc(t['month'])}</th><th>{esc(t['chart_a_short'])}</th>"
+             f"<th>{esc(t['chart_b_short'])}</th></tr></thead><tbody>{rows}</tbody></table>")
     faq, faq_ld = faq_block(t)
     links = "".join(f'<li><a href="{page_path(lang, c, k)}">{esc(page_label(lang, c, k))}</a></li>'
-                    for c in CATEGORIES for k in countries_for(lang) if (c, k) != (cat, country))
+                    for c in CATEGORIES for k in COUNTRIES if (c, k) != (cat, country))
     path = page_path(lang, cat, country)
-    body = (f"<h1>{esc(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
+    body = (f"<h1>{heading(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
             f'<p class="muted">{esc(t["latest"].format(month=month_label(last, lang)))}</p>{cards}'
             f'<a class="cta" href="/">{esc(t["cta"])}</a><p class="muted">{esc(t["cta_note"])}</p>'
             f"{table}{consult_block(t, 'landing')}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
             f'<p class="muted">{esc(t["updated"].format(month=month_label(last, lang)))}</p>')
-    alternates = [("en", page_path("en", cat, country))]
-    if country[1] in ZH_COUNTRIES:
-        alternates.append(("zh-CN", page_path("zh", cat, country)))
-    alternates.append(("x-default", page_path("en", cat, country)))
+    alts = alternates(lambda code: page_path(code, cat, country))
     jsonld = {"@context": "https://schema.org", "@graph": [
         {"@type": "WebPage", "name": title, "description": desc, "url": ORIGIN + path, "inLanguage": t["lang"],
          "dateModified": last + "-01"},
@@ -294,14 +294,15 @@ def build_page(lang, cat, country, monthly, sponsor, analytics=""):
             {"@type": "ListItem", "position": 2, "name": t["all"], "item": ORIGIN + t["hub_path"]},
             {"@type": "ListItem", "position": 3, "name": label, "item": ORIGIN + path}]},
         faq_ld]}
-    return path, last, layout(lang, title, desc, path, body, jsonld, alternates, sponsor, analytics=analytics)
+    return path, last, layout(lang, title, desc, path, body, jsonld, alts, sponsor), alts
 
 
-def build_hub(lang, monthly, sponsor, analytics=""):
+def build_hub(lang, monthly, sponsor):
     t = TEXT[lang]
     rows, latest = [], "0000-00"
+    la, lb, lc = (esc(t["chart_a_short"]), esc(t["chart_b_short"]), esc(t["change_short"]))
     for cat in CATEGORIES:
-        for country in countries_for(lang):
+        for country in COUNTRIES:
             key = f"{cat[1]}|{country[1]}"
             a_hist, b_hist = series(monthly, key, "A"), series(monthly, key, "B")
             months = sorted(set(a_hist) | set(b_hist))
@@ -310,20 +311,22 @@ def build_hub(lang, monthly, sponsor, analytics=""):
             last, prev = months[-1], (months[-2] if len(months) > 1 else None)
             latest = max(latest, last)
             rows.append(f'<tr><td><a href="{page_path(lang, cat, country)}">{esc(page_label(lang, cat, country))}</a></td>'
-                        f"<td>{esc(show(a_hist.get(last), t))}</td><td>{esc(show(b_hist.get(last), t))}</td>"
-                        f"<td>{esc(movement(a_hist.get(prev), a_hist.get(last), t) if prev else '—')}</td></tr>")
-    body = (f"<h1>{esc(t['hub_title'])}</h1><p class=\"muted\">{esc(t['latest'].format(month=month_label(latest, lang)))}</p>"
+                        f'<td class="d" data-label="{la}">{esc(show(a_hist.get(last), t))}</td>'
+                        f'<td class="d" data-label="{lb}">{esc(show(b_hist.get(last), t))}</td>'
+                        f'<td data-label="{lc}">{esc(movement(a_hist.get(prev), a_hist.get(last), t) if prev else "—")}</td></tr>')
+    body = (f"<h1>{heading(t['hub_title'])}</h1><p class=\"muted\">{esc(t['latest'].format(month=month_label(latest, lang)))}</p>"
             f"<p>{esc(t['hub_desc'])}</p><a class=\"cta\" href=\"/\">{esc(t['cta'])}</a>"
-            f"<h2>{esc(t['all'])}</h2><table><thead><tr><th></th><th>{esc(t['chart_a'])}</th><th>{esc(t['chart_b'])}</th>"
-            f"<th>{esc(t['change'])}</th></tr></thead><tbody>{''.join(rows)}</tbody></table>")
+            f"<h2>{esc(t['all'])}</h2><p class=\"muted legend\">{esc(t['legend'])}</p>"
+            f"<table class=\"stack\"><thead><tr><th></th><th>{la}</th><th>{lb}</th>"
+            f"<th>{lc}</th></tr></thead><tbody>{''.join(rows)}</tbody></table>")
     faq, faq_ld = faq_block(t)
     body += consult_block(t, "hub") + faq
     path = t["hub_path"]
-    alternates = [("en", TEXT["en"]["hub_path"]), ("zh-CN", TEXT["zh"]["hub_path"]), ("x-default", TEXT["en"]["hub_path"])]
+    alts = alternates(lambda code: TEXT[code]["hub_path"])
     jsonld = {"@context": "https://schema.org", "@graph": [
         {"@type": "WebPage", "name": t["hub_title"], "description": t["hub_desc"], "url": ORIGIN + path,
          "inLanguage": t["lang"], "dateModified": latest + "-01"}, faq_ld]}
-    return path, latest, layout(lang, t["hub_title"], t["hub_desc"], path, body, jsonld, alternates, sponsor, analytics=analytics)
+    return path, latest, layout(lang, t["hub_title"], t["hub_desc"], path, body, jsonld, alts, sponsor), alts
 
 
 CONSULT = {
@@ -436,7 +439,7 @@ fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},bod
 })();"""
 
 
-def consult_page(lang, latest, analytics=""):
+def consult_page(lang, latest):
     t, c = TEXT[lang], CONSULT[lang]
     path = t["consult_path"]
 
@@ -472,12 +475,11 @@ def consult_page(lang, latest, analytics=""):
             f'<p id="consult-status" class="consult-status" role="status" aria-live="polite" tabindex="-1"></p>'
             f'<h2>{esc(c["privacy_title"])}</h2><ul class="privacy">{privacy}</ul>'
             f"<script>{script}</script>")
-    alternates = [("en", CONSULT_PATHS["en"]), ("zh-CN", CONSULT_PATHS["zh"]), ("x-default", CONSULT_PATHS["en"])]
+    alts = alternates(lambda code: CONSULT_PATHS[code], langs=[code for code in ORDER if code in CONSULT_PATHS])
     jsonld = {"@context": "https://schema.org", "@type": "WebPage", "name": c["title"], "description": c["desc"],
               "url": ORIGIN + path, "inLanguage": t["lang"]}
     # 收集联系方式的页面不加载第三方广告脚本。
-    return path, latest, layout(lang, c["title"], c["desc"], path, body, jsonld, alternates, "",
-                  other_path=CONSULT_PATHS["zh" if lang == "en" else "en"], analytics=analytics)
+    return path, latest, layout(lang, c["title"], c["desc"], path, body, jsonld, alts, ""), alts
 
 
 CONSULT_PATHS = {"en": TEXT["en"]["consult_path"], "zh": TEXT["zh"]["consult_path"]}
@@ -532,7 +534,8 @@ def add_head(html_text):
     html_text = html_text.replace("</head>", HEAD_SEO.format(origin=ORIGIN, ld=ld) + "</head>", 1)
     links = "".join(f'<li><a href="{page_path("en", c, k)}">{esc(page_label("en", c, k))}</a></li>'
                     for c in CATEGORIES for k in COUNTRIES)
-    links += f'<li><a href="{TEXT["en"]["hub_path"]}">All categories</a></li><li><a href="{TEXT["zh"]["hub_path"]}">中文排期表</a></li>'
+    links += "".join(f'<li><a href="{TEXT[code]["hub_path"]}" hreflang="{TEXT[code]["lang"]}" lang="{TEXT[code]["lang"]}">{esc(TEXT[code]["hub_title"])}</a></li>'
+                     for code in ["en"] + [c for c in ORDER if c != "en"])
     return html_text.replace("</body>", NOSCRIPT.format(links=links) + "</body>", 1)
 
 
@@ -545,37 +548,46 @@ def load_catalogs():
     return json.loads(out)
 
 
+def sitemap(urls):
+    """All pages, each with its hreflang alternates (xhtml:link) so search engines see the language groups."""
+    def entry(path, month, alts):
+        links = "".join(f'<xhtml:link rel="alternate" hreflang="{esc(TEXT[h]["lang"] if h in TEXT else h)}" href="{ORIGIN}{esc(p)}"/>'
+                        for h, p in alts)
+        return f"<url><loc>{ORIGIN}{esc(path)}</loc><lastmod>{month}-01</lastmod>{links}</url>\n"
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+            'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' + "".join(entry(*u) for u in urls) + "</urlset>\n")
+
+
+def write_page(site, path, text):
+    target = site / path.strip("/") / "index.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+
+
 def build(site, sponsor_src=None, catalogs=None, analytics_src=None):
     """Write the pages into `site` (dist/site). Returns the paths written, for tests."""
+    global ANALYTICS_TAG
+    ANALYTICS_TAG = analytics_tag(analytics_src)
     monthly = json.loads((ROOT / "data" / "visa_bulletin_history.json").read_text(encoding="utf-8"))["monthly"]
     catalogs = catalogs if catalogs is not None else (load_catalogs() if sponsor_src else {})
     pages, latest = [], "0000-00"
-    analytics = analytics_tag(analytics_src)
-    for lang in ("en", "zh"):
+    for lang in ["en"] + [code for code in ORDER if code != "en"]:
         sponsor = sponsor_bits(lang, sponsor_src, catalogs) if sponsor_src else ""
-        built = [build_hub(lang, monthly, sponsor, analytics)]
-        built += [build_page(lang, c, k, monthly, sponsor, analytics) for c in CATEGORIES for k in countries_for(lang)]
-        for item in filter(None, built):
-            path, month, text = item
-            target = site / path.strip("/") / "index.html"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text, encoding="utf-8")
-            pages.append((path, month))
+        built = [build_hub(lang, monthly, sponsor)]
+        built += [build_page(lang, c, k, monthly, sponsor) for c in CATEGORIES for k in COUNTRIES]
+        for path, month, text, alts in filter(None, built):
+            write_page(site, path, text)
+            pages.append((path, month, alts))
             latest = max(latest, month)
-    for lang in ("en", "zh"):
-        path, month, text = consult_page(lang, latest, analytics)
-        target = site / path.strip("/") / "index.html"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
-        pages.append((path, month))
-    urls = [("/", latest)] + pages
-    (site / "sitemap.xml").write_text(
-        '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "".join(f"<url><loc>{ORIGIN}{p}</loc><lastmod>{m}-01</lastmod></url>\n" for p, m in urls)
-        + "</urlset>\n", encoding="utf-8")
+    for lang in CONSULT_PATHS:
+        path, month, text, alts = consult_page(lang, latest)
+        write_page(site, path, text)
+        pages.append((path, month, alts))
+    urls = [("/", latest, [])] + pages
+    (site / "sitemap.xml").write_text(sitemap(urls), encoding="utf-8")
     (site / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {ORIGIN}/sitemap.xml\n", encoding="utf-8")
     (site / "feed.xml").write_text(feed(monthly, latest), encoding="utf-8")
-    return [p for p, _ in urls]
+    return [p for p, _, _ in urls]
 
 
 if __name__ == "__main__":
