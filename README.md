@@ -189,7 +189,7 @@ claude  # 启动 Claude Code
 
 首次打开 `index.html` 时，会弹出欢迎面板要求输入你自己的 Priority Date、类别、出生国等信息。数据仅保存在浏览器 localStorage，不会上传。
 
-预测结果（P50 中位 + 90% 置信区间）以你输入的 PD 为准计算。
+预测结果（P50 中位 + p10–p90 的 80% 区间）以你输入的 PD 为准计算。
 
 ## License
 
