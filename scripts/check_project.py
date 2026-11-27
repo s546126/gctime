@@ -191,6 +191,38 @@ def check_bulletin_data():
                     raise SystemExit(f"CUTOFF_DATA {key}={v} 与 JSON {last} 期 {monthly[key].get(last)} 不一致")
 
 
+def check_i485_queue():
+    """I-485 排位数据：index.html 嵌入块 == data/i485_queue.json，且最新一期就是本地最新的库存快照。
+    只用 JSON 与正则（source-checks 没装 openpyxl）。新快照下载后忘了重跑
+    scripts/build_i485_queue.py --inject 会在这里失败。"""
+    import re
+    months = ["january", "february", "march", "april", "may", "june",
+              "july", "august", "september", "october", "november", "december"]
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    m = re.search(r"/\*I485Q_BEGIN\*/(.*?)/\*I485Q_END\*/", html, re.S)
+    if not m:
+        raise SystemExit("index.html 缺 I485Q_BEGIN/I485Q_END 标记")
+    doc = json.loads((ROOT / "data" / "i485_queue.json").read_text(encoding="utf-8"))
+    if json.loads(m.group(1)) != doc:
+        raise SystemExit("index.html 的 I485_QUEUE 与 data/i485_queue.json 不一致，请运行 scripts/build_i485_queue.py --inject")
+    files = []
+    for f in (ROOT / "data" / "raw" / "uscis").glob("I485_Pending_Inventory_*.xlsx"):
+        fm = re.fullmatch(r"I485_Pending_Inventory_([a-z]+)_(\d{4})\.xlsx", f.name)
+        if fm and fm.group(1) in months:
+            files.append(((int(fm.group(2)), months.index(fm.group(1))), f.name))
+    newest = max(files)[1] if files else None
+    snaps = doc.get("snapshots") or []
+    if not snaps or snaps[-1]["file"] != newest:
+        raise SystemExit(f"data/i485_queue.json 最新一期 {snaps[-1]['file'] if snaps else '无'} 不是本地最新库存 {newest}，"
+                         "请运行 scripts/build_i485_queue.py --inject")
+    for key, per in doc["cells"].items():
+        if len(per) != len(snaps):
+            raise SystemExit(f"I485_QUEUE {key} 的期数与 snapshots 不一致")
+        for enc in per:
+            if enc and len(enc["n"]) > 12 * (enc["y1"] - enc["y0"] + 2):
+                raise SystemExit(f"I485_QUEUE {key} 的 n 超出年份范围")
+
+
 def check_analytics():
     """匿名统计只进在线产物，并且只在正式域名的 HTTPS 页面加载 PostHog。"""
     source = (ROOT / "src" / "analytics.js").read_text(encoding="utf-8")
@@ -242,6 +274,7 @@ def main(source_only=False):
     check_sponsor()
     check_analytics()
     check_bulletin_data()
+    check_i485_queue()
     print("✓ Python / Shell / JavaScript 语法、JSON 和页面资源检查通过")
 
 

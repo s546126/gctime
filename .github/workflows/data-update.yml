@@ -47,6 +47,13 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: python scripts/sniff_visa_bulletin.py --filing-chart || true
 
+      # 新库存快照 → 重建「排在你前面」数据并嵌入 index.html（输出确定，无新快照时不产生改动）。
+      # 失败要让本次运行失败：表结构变了必须有人看，而不是带着旧数据静默上线。
+      - name: Rebuild I-485 queue data
+        run: |
+          pip install openpyxl -q
+          python scripts/build_i485_queue.py --inject
+
       - name: Commit and push if new files
         id: commit
         run: |
@@ -54,7 +61,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # index.html 也要暂存：上一步的 AOS 用表补判会写回 FILING_CHART/
           # FILING_CHART_STATE，只 add data/raw/ 会让该结果每天被丢弃、永远停在待确认。
-          git add data/raw/ index.html
+          git add data/raw/ data/i485_queue.json data/china_eb1_pd_density.json index.html
           if git diff --cached --quiet; then
             echo "No new data files"
           else
