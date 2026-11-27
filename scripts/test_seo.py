@@ -54,6 +54,8 @@ def check_consult(site):
         assert 'class="privacy"' in text and "github.com/s546126/gctime" in text, path
         assert "guarantee" not in text.lower(), path
         assert f'<link rel="canonical" href="{build_seo.ORIGIN}{path}">' in text, path
+        assert f'<meta property="og:image" content="{build_seo.ORIGIN}/og-image.png">' in text, path
+        assert '<meta name="twitter:card" content="summary_large_image">' in text, path
 
 
 def check_text():
@@ -183,6 +185,7 @@ def main():
         assert 'id="gc-sponsor-slot"' not in (empty / "visa-bulletin" / "index.html").read_text(encoding="utf-8")
         assert "analytics" not in (empty / "consult" / "index.html").read_text(encoding="utf-8").split("<main>")[0]
     head = build_seo.add_head("<html><head></head><body></body></html>")
+    assert "/og-image.png" in head and "summary_large_image" in head
     assert head.count('rel="canonical"') == 1 and "/visa-bulletin/eb-1-india/" in head and "/ar/visa-bulletin/" in head
     print(f"✅ SEO 页面检查通过（{len(paths)} 个 URL，{len(LANGS)} 种语言）")
 
