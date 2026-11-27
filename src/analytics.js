@@ -19,6 +19,18 @@
 
   if (window.GCAnalytics) return
 
+  // 本次会话第一次带 utm_source 进站时记下来源（只留 utm_source / utm_medium，小写、限长），
+  // 咨询表单把它附在线索的 source 上，好区分 X 等渠道带来的线索。只存在本标签页的 sessionStorage，不单独发送。
+  try {
+    const q = new URLSearchParams(location.search)
+    const tag = v => (v || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32)
+    const src = tag(q.get('utm_source'))
+    if (src && !window.sessionStorage.getItem('gc_utm')) {
+      const medium = tag(q.get('utm_medium'))
+      window.sessionStorage.setItem('gc_utm', 'utm_source=' + src + (medium ? '&utm_medium=' + medium : ''))
+    }
+  } catch { /* 存储不可用时只是不记来源。 */ }
+
   // 只保留来源、路径和允许的查询参数；不保留 # 片段。
   function cleanUrl(value) {
     if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) return value
