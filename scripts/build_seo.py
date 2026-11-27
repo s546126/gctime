@@ -4,7 +4,8 @@
 The predictor itself is a JS app, so search engines see almost no text on it. These pages are plain
 HTML (no app scripts): one page per category × country with the latest Visa Bulletin cutoffs (Chart A
 Final Action / Chart B Dates for Filing), month-over-month movement and a 24-month table, plus hubs,
-sitemap.xml, robots.txt and an Atom feed. Every number comes from the bulletin history; the pages make
+sitemap.xml, robots.txt and an Atom feed. EB-1/2/3 pages also list the latest USCIS pending I-485
+inventory by priority-date year (data/i485_queue.json, from scripts/build_i485_queue.py). Every other number comes from the bulletin history; the pages make
 no forecast of their own and send readers to the predictor for that. Online builds add the same
 bottom sponsor banner as the app (src/sponsor.js, which only runs on the production hosts). Online builds
 also load src/analytics.js on every page, including /consult/; it only loads PostHog on the production hosts.
@@ -44,6 +45,7 @@ COUNTRIES = [  # (slug, data key, English name, Chinese name); names per locale 
     ("mexico", "MX", "Mexico", "墨西哥"),
     ("philippines", "PH", "Philippines", "菲律宾"),
 ]
+QUEUE = None  # build() 时读入 data/i485_queue.json
 for _lang, _t in TEXT.items():
     _t["hub_path"] = "/visa-bulletin/" if _lang == "en" else f"/{_lang}/visa-bulletin/"
 
@@ -252,6 +254,50 @@ def consult_block(t, placement):
             f'<a href="{t["consult_path"]}" data-gc-cta="{placement}">{esc(t["consult_cta_link"])} {t["arrow"]}</a></section>')
 
 
+def load_queue():
+    """data/i485_queue.json（scripts/build_i485_queue.py 生成）；没有时静态页不加库存段。"""
+    path = ROOT / "data" / "i485_queue.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
+def inventory_rows(queue, cat_key, country_key):
+    """最新一期库存按 PD 年汇总：[(年 或 'prior', 确切数, D格数)]，以及 (as-of, 合计确切数, 合计D格数)。
+    只收 EB-1/2/3；没有数据返回 None。"""
+    per = (queue or {}).get("cells", {}).get(("EB-1" if cat_key == "EB-1A" else cat_key) + "|" + country_key)
+    enc = per[-1] if per else None
+    if not enc:
+        return None
+    dmap = dict((slot, count) for slot, count in enc["d"])
+    rows = []
+    for i, year in enumerate(["prior", *range(enc["y0"], enc["y1"] + 1)]):
+        slots = range(12 * i, 12 * i + 12)
+        rows.append((year, sum(enc["n"][j] for j in slots if j < len(enc["n"])), sum(dmap.get(j, 0) for j in slots)))
+    total = (sum(r[1] for r in rows), sum(r[2] for r in rows))
+    return rows, (queue["snapshots"][-1]["asof"], *total)
+
+
+def inventory_block(lang, cat, country, queue):
+    """排期页上的「按 PD 年份的在案 I-485」：只列有人的年份，D 按 5 件估算并标 ≈。"""
+    data = inventory_rows(queue, cat[1], country[1])
+    if not data:
+        return ""
+    t = TEXT[lang]
+    rows, (asof, total_n, total_d) = data
+    est = queue["d"]["est"]
+
+    def fmt(n, d):
+        return f"≈ {n + d * est:,}" if d else f"{n:,}"
+    cat_name, country_name = names(lang, cat, country)
+    body = "".join(
+        f'<tr><td>{esc(t["inv_before"].format(year=rows[1][0]) if y == "prior" else y)}</td><td class="d">{esc(fmt(n, d))}</td></tr>'
+        for y, n, d in rows if n or d)
+    body += f'<tr><td><b>{esc(t["inv_total"])}</b></td><td class="d"><b>{esc(fmt(total_n, total_d))}</b></td></tr>'
+    intro = t["inv_intro"].format(date=asof, total=fmt(total_n, total_d), cat=cat_name, country=country_name)
+    return (f'<section class="inventory" id="i485-inventory"><h2>{esc(t["inv_title"])}</h2><p>{esc(intro)}</p>'
+            f'<table><thead><tr><th>{esc(t["inv_year"])}</th><th>{esc(t["inv_count"])}</th></tr></thead><tbody>{body}</tbody></table>'
+            f'<p class="muted">{esc(t["inv_note"])}</p></section>')
+
+
 def build_page(lang, cat, country, monthly, sponsor):
     t = TEXT[lang]
     key = f"{cat[1]}|{country[1]}"
@@ -287,7 +333,7 @@ def build_page(lang, cat, country, monthly, sponsor):
     body = (f"<h1>{heading(t['h1'].format(cat=cat_name, country=country_name))}</h1>"
             f'<p class="muted">{esc(t["latest"].format(month=month_label(last, lang)))}</p>{cards}'
             f'<a class="cta" href="/">{esc(t["cta"])}</a><p class="muted">{esc(t["cta_note"])}</p>'
-            f"{table}{consult_block(t, 'landing')}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
+            f"{table}{inventory_block(lang, cat, country, QUEUE)}{consult_block(t, 'landing')}{faq}<h2>{esc(t['other'])}</h2><ul class=\"links\">{links}</ul>"
             f'<p class="muted">{esc(t["updated"].format(month=month_label(last, lang)))}</p>')
     alts = alternates(lambda code: page_path(code, cat, country))
     jsonld = {"@context": "https://schema.org", "@graph": [
@@ -573,8 +619,9 @@ def write_page(site, path, text):
 
 def build(site, sponsor_src=None, catalogs=None, analytics_src=None):
     """Write the pages into `site` (dist/site). Returns the paths written, for tests."""
-    global ANALYTICS_TAG
+    global ANALYTICS_TAG, QUEUE
     ANALYTICS_TAG = analytics_tag(analytics_src)
+    QUEUE = load_queue()
     monthly = json.loads((ROOT / "data" / "visa_bulletin_history.json").read_text(encoding="utf-8"))["monthly"]
     catalogs = catalogs if catalogs is not None else (load_catalogs() if sponsor_src else {})
     pages, latest = [], "0000-00"
