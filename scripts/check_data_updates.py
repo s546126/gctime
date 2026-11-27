@@ -346,10 +346,74 @@ def download(url: str, dest: Path) -> bool:
         return False
 
 
-def check_i485_inventory(dry_run: bool) -> list[str]:
-    """Check for new monthly I-485 Pending Inventory snapshots."""
+# ---- I-485 库存文件名 ----
+# 2026-05 起 USCIS 给文件名加版本后缀：5~8 月是 `_v1.0`，9~10 月是 `_v1`；之前没有后缀。
+# 只拼无后缀 URL 会全部 404，于是 2026-05~10 连续半年没抓到（本地停在 april_2026）。
+# 本地文件名仍用 I485_Pending_Inventory_<month>_<year>.xlsx，实际来源记在 INVENTORY_SOURCES。
+USCIS_DATA_PAGE = "https://www.uscis.gov/tools/reports-and-studies/immigration-and-citizenship-data"
+INVENTORY_SOURCES = USCIS_DIR / "inventory_sources.json"
+_INV_NAME = re.compile(r"eb_inventory_([a-z]+)_(\d{4})(?:_v(\d+)(?:\.(\d+))?)?\.xlsx", re.I)
+# 逐个探测的顺序：新版本在前，第一个 200 即最新版本
+INVENTORY_SUFFIXES = ["_v3.0", "_v3", "_v2.0", "_v2", "_v1.0", "_v1", ""]
+
+
+def inventory_version(name: str):
+    """'eb_inventory_october_2026_v1.xlsx' → ('october', 2026, (1, 0))；无后缀为 (0, 0)。
+    不是库存文件名返回 None。版本按 (主, 次) 比较，`_v1` 与 `_v1.0` 视为同一版本。"""
+    m = _INV_NAME.search(name or "")
+    if not m or m.group(1).lower() not in MONTHS:
+        return None
+    ver = (int(m.group(3) or 0), int(m.group(4) or 0))
+    return m.group(1).lower(), int(m.group(2)), ver
+
+
+def inventory_candidate_urls(month_name: str, year: int) -> list[str]:
+    """某月库存的候选 URL，按版本从新到旧。"""
+    return [f"{USCIS_BASE}/eb_inventory_{month_name}_{year}{sfx}.xlsx" for sfx in INVENTORY_SUFFIXES]
+
+
+def parse_inventory_links(html: str) -> dict:
+    """从 USCIS 数据页解析 eb_inventory_*.xlsx 链接。
+    返回 {(year, month): (version, absolute_url)}，同一月份有多个版本时保留最新。"""
+    out = {}
+    for href in re.findall(r"""href=["']([^"']*eb_inventory_[^"']*?\.xlsx)["']""", html or "", re.I):
+        info = inventory_version(href.rsplit("/", 1)[-1])
+        if not info:
+            continue
+        month_name, year, ver = info
+        url = urllib.parse.urljoin("https://www.uscis.gov/", href)
+        key = (year, MONTHS.index(month_name) + 1)
+        if key not in out or ver > out[key][0]:
+            out[key] = (ver, url)
+    return out
+
+
+def _load_inventory_sources() -> dict:
+    try:
+        return json.loads(INVENTORY_SOURCES.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+
+
+def _save_inventory_sources(sources: dict):
+    INVENTORY_SOURCES.write_text(json.dumps(dict(sorted(sources.items())), indent=1) + "\n", encoding="utf-8")
+
+
+def check_i485_inventory(dry_run: bool, listing_html: str | None = None) -> list[str]:
+    """Check for new monthly I-485 Pending Inventory snapshots.
+
+    先读 USCIS 数据页上的链接（只挂最近一两期，但带真实版本号）；页上没有的月份
+    再按 INVENTORY_SUFFIXES 逐个探测。已下载的月份若页上出现更高版本，重新下载覆盖。"""
     new_files = []
     now = datetime.now()
+    if listing_html is None:
+        listing_html = _get_text(USCIS_DATA_PAGE)
+    listed = parse_inventory_links(listing_html)
+    if not listed:
+        # 页可能被挡或改版；不影响逐个探测，但必须看得见
+        print("  [告警] USCIS 数据页未解析到任何 eb_inventory_*.xlsx 链接，改为逐个探测版本后缀")
+    sources = _load_inventory_sources()
+    changed = False
 
     for year in range(2025, now.year + 1):
         for month_name in MONTHS:
@@ -358,20 +422,39 @@ def check_i485_inventory(dry_run: bool) -> list[str]:
                 break
 
             local = USCIS_DIR / f"I485_Pending_Inventory_{month_name}_{year}.xlsx"
+            hit = listed.get((year, month_idx))
             if local.exists():
-                continue
+                have = inventory_version(sources.get(local.name, f"eb_inventory_{month_name}_{year}.xlsx"))
+                if not hit or not have or hit[0] <= have[2]:
+                    continue
+                print(f"  NEWER VERSION: {hit[1].rsplit('/', 1)[-1]}（本地为 v{have[2][0]}.{have[2][1]}）")
+                url = hit[1]
+            elif hit:
+                url = hit[1]
+            else:
+                url = None
+                for cand in inventory_candidate_urls(month_name, year):
+                    if probe_diag("I-485库存", cand) == 200:
+                        url = cand
+                        break
+                if url and listed:
+                    # 页上列出了别的月份却没列这个：多半已下架；真命中也要提示，便于发现命名又变
+                    print(f"  [告警] {url.rsplit('/', 1)[-1]} 不在 USCIS 数据页上，靠逐个探测找到")
+                if not url:
+                    continue
 
-            url = f"{USCIS_BASE}/eb_inventory_{month_name}_{year}.xlsx"
-            if probe_diag("I-485库存", url) == 200:
-                new_files.append(str(local.relative_to(REPO_ROOT)))
-                if not dry_run:
-                    if download(url, local):
-                        print(f"  DOWNLOADED: {local.name}")
-                    else:
-                        new_files.pop()
-                else:
-                    print(f"  AVAILABLE: {local.name}")
+            new_files.append(str(local.relative_to(REPO_ROOT)))
+            if dry_run:
+                print(f"  AVAILABLE: {local.name} ← {url.rsplit('/', 1)[-1]}")
+            elif download(url, local):
+                print(f"  DOWNLOADED: {local.name} ← {url.rsplit('/', 1)[-1]}")
+                sources[local.name] = url.rsplit("/", 1)[-1]
+                changed = True
+            else:
+                new_files.pop()
 
+    if changed:
+        _save_inventory_sources(sources)
     return new_files
 
 
