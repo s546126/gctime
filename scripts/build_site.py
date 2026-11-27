@@ -16,7 +16,7 @@ from build_offline import ensure_ui_assets, main as build_offline
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = (
     "index.html", "manifest.json", "sw.js", "icon.svg", "icon-192.png",
-    "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png",
+    "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "og-image.png",
     "vendor/gsap.min.js",
     "assets/ui.js", "assets/ui.css",
 )

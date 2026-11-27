@@ -211,7 +211,11 @@ def layout(lang, title, desc, path, body, jsonld, alts, sponsor):
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:url" content="{ORIGIN}{esc(path)}">
 <meta property="og:locale" content="{t['lang'].replace('-', '_')}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="{ORIGIN}/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="GC Time: when will your priority date be current?">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="alternate" type="application/atom+xml" title="{esc(t['feed'])}" href="/feed.xml">
 <style>{STYLE}</style>
@@ -514,8 +518,11 @@ HEAD_SEO = """<meta name="description" content="Free EB-1, EB-2, EB-3, EB-4 and 
 <meta property="og:title" content="GC Time · Green card priority date predictor (EB-1 to EB-5)">
 <meta property="og:description" content="Estimate when your EB priority date becomes current. Free, private, works offline.">
 <meta property="og:url" content="{origin}/">
-<meta property="og:image" content="{origin}/icon-512.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="{origin}/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="GC Time: when will your priority date be current?">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" type="application/atom+xml" title="Visa Bulletin updates" href="/feed.xml">
 <script type="application/ld+json">{ld}</script>
 """
