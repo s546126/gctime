@@ -175,8 +175,9 @@ def main():
         enc = queue["cells"]["EB-2|CN"][-1]
         total = sum(enc["n"]) + queue["d"]["est"] * sum(c for _, c in enc["d"])
         assert '<section class="inventory" id="i485-inventory">' in page, "eb-2-china 缺库存段"
-        assert f"<b>≈ {total:,}</b>" in page and queue["snapshots"][-1]["asof"] in page, "库存合计或日期不符"
-        assert "Before 2017" in page and "Pending I-485s by priority date year" in page
+        shown = f"≈ {total:,}" if any(c for _, c in enc["d"]) else f"{total:,}"
+        assert f"<b>{shown}</b>" in page and queue["snapshots"][-1]["asof"] in page, "库存合计或日期不符"
+        assert f"Before {enc['y0']}" in page and "Pending I-485s by priority date year" in page
         zh_page = (site / "zh" / "eb-1-india" / "index.html").read_text(encoding="utf-8")
         assert "按优先日年份的在案 I-485" in zh_page and "在案 I-485 共" in zh_page
         for path in ("/visa-bulletin/eb-4-china/", "/zh/eb-5-india/"):

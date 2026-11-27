@@ -42,22 +42,21 @@ async function openProfile(page, { category, country, pd, language }) {
   await expect(page.locator('#hero-value')).not.toHaveText('--')
 }
 
-test('parser output matches cells checked by hand in the October 2026 xlsx', () => {
-  expect(QUEUE.snapshots.map(s => s.asof)).toEqual(['2026-08-05', '2026-09-03', '2026-10-05'])
-  expect(QUEUE.snapshots[2].file).toBe('I485_Pending_Inventory_october_2026.xlsx')
-  const cn1 = latest('EB-1|CN')
-  // China EB1：Available 2023-01 = 221；Awaiting 2023-07 = 595（Available 为 0）；2024-01 Awaiting = D
-  expect(slotValue(cn1, 2023, 1)).toEqual({ n: 221, d: 0 })
-  expect(slotValue(cn1, 2023, 7)).toEqual({ n: 595, d: 0 })
-  expect(slotValue(cn1, 2024, 1)).toEqual({ n: 0, d: 1 })
-  // Prior Years 3 月：Available 19 + Awaiting 0
-  expect(slotValue(cn1, 'prior', 3)).toEqual({ n: 19, d: 0 })
-  // India EB-2 在单独的表里，年份列 2006–2015；2013-05 Available = 188
-  const in2 = latest('EB-2|IN')
-  expect([in2.y0, in2.y1]).toEqual([2006, 2015])
-  expect(slotValue(in2, 2013, 5)).toEqual({ n: 188, d: 0 })
-  // 只收 EB-1/2/3 × 五个出生国
+// 解析器逐格对照见 scripts/test_i485_queue.py（钉在 2026-10-05 快照上）；这里只断言不随数据窗口滚动而变的结构。
+test('embedded queue data covers EB-1/2/3 for every chargeability and stays in range', () => {
+  expect(QUEUE.snapshots.length).toBeGreaterThanOrEqual(1)
+  expect(QUEUE.snapshots.length).toBeLessThanOrEqual(3)
+  expect(QUEUE.snapshots.map(s => s.asof)).toEqual(QUEUE.snapshots.map(s => s.asof).slice().sort())
   expect(Object.keys(QUEUE.cells).sort()).toEqual(['EB-1', 'EB-2', 'EB-3'].flatMap(c => ['CN', 'IN', 'MX', 'PH', 'ROW'].map(co => `${c}|${co}`)).sort())
+  for (const [key, per] of Object.entries(QUEUE.cells)) {
+    expect(per.length, key).toBe(QUEUE.snapshots.length)
+    for (const enc of per.filter(Boolean)) {
+      expect(enc.n.length, key).toBeLessThanOrEqual(12 * (enc.y1 - enc.y0 + 2))
+      expect(enc.n.every(v => Number.isInteger(v) && v >= 0), key).toBe(true)
+    }
+  }
+  // India EB-2/EB-3 来自单独的表，年份列比其他表早得多
+  expect(latest('EB-2|IN').y1).toBeLessThan(latest('EB-1|IN').y1)
 })
 
 test('EB-2 China shows filed I-485s ahead, share, change across snapshots and caveats', async ({ page }) => {
@@ -66,17 +65,19 @@ test('EB-2 China shows filed I-485s ahead, share, change across snapshots and ca
   await expect(panel).toBeVisible()
   await expect(panel.locator('#queue-title')).toHaveText('I-485 库存里排在你前面的人')
   const expected = aheadEstimate(latest('EB-2|CN'), 2022, 6)
-  await expect(panel.locator('[data-queue-ahead]')).toHaveText('≈ ' + expected.toLocaleString('zh-CN'))
-  await expect(panel.locator('.queue-range')).toContainText('D 格按 1–9 件计')
+  const hasD = latest('EB-2|CN').d.some(([slot]) => slot < 12 * (2022 - latest('EB-2|CN').y0 + 1) + 5)
+  await expect(panel.locator('[data-queue-ahead]')).toHaveText((hasD ? '≈ ' : '') + expected.toLocaleString('zh-CN'))
+  if (hasD) await expect(panel.locator('.queue-range')).toContainText('D 格按 1–9 件计')
   await expect(panel).toContainText('2022年6月')
   await expect(panel).toContainText('在案总数')
   const first = aheadEstimate(QUEUE.cells['EB-2|CN'][0], 2022, 6)
   const change = panel.locator('[data-queue-change]')
   await expect(change).toHaveAttribute('data-queue-change', first - expected >= 10 ? 'cleared' : first - expected <= -10 ? 'grew' : 'flat')
-  await expect(change).toContainText('2026-08-05')
-  await expect(panel.locator('.queue-table tbody tr')).toHaveCount(3)
-  await expect(panel.locator('.queue-table tbody tr').first().locator('th')).toHaveText('2026-10-05')
-  await expect(panel.locator('.queue-note')).toHaveText('只计已递交的 I-485，是下界 · USCIS 数据截至 2026-10-05')
+  const asofs = QUEUE.snapshots.map(s => s.asof)
+  await expect(change).toContainText(asofs[0])
+  await expect(panel.locator('.queue-table tbody tr')).toHaveCount(asofs.length)
+  await expect(panel.locator('.queue-table tbody tr').first().locator('th')).toHaveText(asofs[asofs.length - 1])
+  await expect(panel.locator('.queue-note')).toHaveText('只计已递交的 I-485，是下界 · USCIS 数据截至 ' + asofs[asofs.length - 1])
   await panel.locator('.queue-details summary').click()
   await expect(panel.locator('.queue-details li')).toHaveCount(5)
   await expect(panel.locator('.queue-details')).toContainText('NVC')

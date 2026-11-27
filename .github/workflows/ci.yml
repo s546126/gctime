@@ -81,6 +81,10 @@ jobs:
         run: npm run build
       - name: Validate generated assets
         run: python scripts/check_project.py
+      - name: I-485 inventory parser regression
+        run: |
+          pip install openpyxl -q
+          python scripts/test_i485_queue.py
       - name: Install browser test dependencies
         run: npx playwright install --with-deps chromium
       - name: Browser regression

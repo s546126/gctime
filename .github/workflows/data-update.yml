@@ -52,6 +52,7 @@ jobs:
       - name: Rebuild I-485 queue data
         run: |
           pip install openpyxl -q
+          python scripts/test_i485_queue.py
           python scripts/build_i485_queue.py --inject
 
       - name: Commit and push if new files
