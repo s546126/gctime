@@ -170,6 +170,18 @@ def main():
         last = max(hist)
         page = (site / "visa-bulletin" / "eb-2-china" / "index.html").read_text(encoding="utf-8")
         assert build_seo.show(hist[last], TEXT["en"]) in page
+        # I-485 库存段：EB-1/2/3 页面有、EB-4/5 没有；合计与 data/i485_queue.json 最新一期一致（D 按 5 件）。
+        queue = json.loads((build_seo.ROOT / "data" / "i485_queue.json").read_text(encoding="utf-8"))
+        enc = queue["cells"]["EB-2|CN"][-1]
+        total = sum(enc["n"]) + queue["d"]["est"] * sum(c for _, c in enc["d"])
+        assert '<section class="inventory" id="i485-inventory">' in page, "eb-2-china 缺库存段"
+        shown = f"≈ {total:,}" if any(c for _, c in enc["d"]) else f"{total:,}"
+        assert f"<b>{shown}</b>" in page and queue["snapshots"][-1]["asof"] in page, "库存合计或日期不符"
+        assert f"Before {enc['y0']}" in page and "Pending I-485s by priority date year" in page
+        zh_page = (site / "zh" / "eb-1-india" / "index.html").read_text(encoding="utf-8")
+        assert "按优先日年份的在案 I-485" in zh_page and "在案 I-485 共" in zh_page
+        for path in ("/visa-bulletin/eb-4-china/", "/zh/eb-5-india/"):
+            assert 'id="i485-inventory"' not in (site / path.strip("/") / "index.html").read_text(encoding="utf-8"), path
         hub = (site / "zh" / "visa-bulletin" / "index.html").read_text(encoding="utf-8")
         assert hub.count("<tr><td><a ") == 25 and 'class="stack"' in hub and "最终裁决日期（表A）</th>" not in hub
         ar = (site / "ar" / "visa-bulletin" / "index.html").read_text(encoding="utf-8")

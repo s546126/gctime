@@ -4,7 +4,7 @@ Public government data for EB-1 priority date prediction.
 
 All files are from official USCIS/DOS sources or community-curated public datasets.
 
-## USCIS I-485 Pending Inventory (9 snapshots)
+## USCIS I-485 Pending Inventory (monthly snapshots)
 
 Monthly cohort data: category x country x PD-month x count.
 
@@ -20,8 +20,19 @@ Monthly cohort data: category x country x PD-month x count.
 | I485_Pending_Inventory_november_2025.xlsx | Nov 2025 | uscis.gov |
 | I485_Pending_Inventory_december_2025.xlsx | Dec 2025 | uscis.gov |
 | I485_Pending_Inventory_january_2026.xlsx | Jan 2026 | uscis.gov |
+| I485_Pending_Inventory_february_2026.xlsx | Feb 2026 | uscis.gov (`eb_inventory_february_2026.xlsx`) |
+| I485_Pending_Inventory_march_2026.xlsx | Mar 2026 | uscis.gov (`eb_inventory_march_2026.xlsx`) |
+| I485_Pending_Inventory_april_2026.xlsx | Apr 2026 | uscis.gov (`eb_inventory_april_2026.xlsx`) |
+| I485_Pending_Inventory_may_2026.xlsx | May 2026 | uscis.gov (`eb_inventory_may_2026_v1.0.xlsx`) |
+| I485_Pending_Inventory_june_2026.xlsx | Jun 2026 | uscis.gov (`eb_inventory_june_2026_v1.0.xlsx`) |
+| I485_Pending_Inventory_july_2026.xlsx | Jul 2026 | uscis.gov (`eb_inventory_july_2026_v1.0.xlsx`) |
+| I485_Pending_Inventory_august_2026.xlsx | Aug 2026 | uscis.gov (`eb_inventory_august_2026_v1.0.xlsx`) |
+| I485_Pending_Inventory_september_2026.xlsx | Sep 2026 | uscis.gov (`eb_inventory_september_2026_v1.xlsx`) |
+| I485_Pending_Inventory_october_2026.xlsx | Oct 2026 | uscis.gov (`eb_inventory_october_2026_v1.xlsx`) |
 
-Gap: Jun-Sep 2025 not published by USCIS.
+Gap: Jun-Sep 2025 not published by USCIS. Since May 2026 USCIS adds a version suffix to the file name (`_v1.0`, `_v1`); `scripts/check_data_updates.py` reads the links on the USCIS data page, probes the suffixes, and records the real source name in `raw/uscis/inventory_sources.json`.
+
+Derived: `i485_queue.json` (last 3 snapshots, EB-1/2/3 × CN/IN/MX/PH/ROW, for the in-app queue position) and `china_eb1_pd_density.json` are rebuilt by `scripts/build_i485_queue.py --inject`.
 
 ## USCIS I-140 Quarterly Reports (5 quarters)
 

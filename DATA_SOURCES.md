@@ -41,7 +41,7 @@
 二者在 2021-09~2025-12 的 2,520 个重叠格子逐格一致。2026-10 期抽查（律所摘要，经 WebSearch）：EB-2 中国 A 2021-10-01、印度 A 2013-11-01；EB-5 中国 A 2016-12-01 / B 2021-03-01，印度 A 2023-12-01 / B 2024-05-01；三个 EB-5 预留类 Current；EB-3 中国 B 2024-04-01 —— 均吻合。**仍非一手来源，请以官方公告为准。**
 未收录：EW、EB-4 宗教工作者、ESGH 列（2023-03 后取消）。EB-5 预留类的 2026 年月份来自律所摘要。EB-1A 中国原先另存于 index.html 手写的 `HISTORY`/`HISTORY_B`，与本 JSON 有 6 个月不一致（表A 2026-03；表B 2024-10、2025-07、2025-12、2026-01、2026-03）。已逐期对照官方公告：6 处均为 JSON 正确，现 EB-1A 中国与其他格子一样只从本 JSON 生成（HIST_DATA），`scripts/check_project.py` 校验两者逐月一致。
 
-标定用 USCIS 数据：`data/raw/uscis/I140_I360_I526_Approved_FY2026_Q1.xlsx`（as of 2025-12，按国别×类别的已批准 I-140 待签主申）与 `I485_Pending_Inventory_april_2026.xlsx`，见 `scripts/calibrate_categories.py`。
+标定用 USCIS 数据：`data/raw/uscis/I140_I360_I526_Approved_FY2026_Q1.xlsx`（as of 2025-12，按国别×类别的已批准 I-140 待签主申）与最新的 I-485 库存快照（现为 `I485_Pending_Inventory_october_2026.xlsx`，as of 2026-10-05），见 `scripts/calibrate_categories.py`。
 
 ---
 
@@ -52,7 +52,8 @@
 **最重要数据源**。USCIS 每月发布 XLSX,按"类别 × 国家 × PD 月份 × 数量"切片。
 
 - 入口: https://www.uscis.gov/tools/reports-and-studies/immigration-and-citizenship-data
-- 最新: "Pending Applications for Employment-Based Preference Categories as of January 2, 2026" (XLSX, 107.89 KB)
+- 最新: "Pending Applications for Employment-Based Preference Categories as of October 5, 2026" (`eb_inventory_october_2026_v1.xlsx`)
+- 文件名 2026-05 起带版本后缀：5–8 月 `_v1.0`，9–10 月 `_v1`（之前无后缀）。数据页只挂最近两期；更早的按后缀探测。
 - 历史 CSV 格式 (2014-): 
   - https://www.uscis.gov/sites/default/files/document/data/EB-I-485-PendingInventory-2014-Jan.csv
   - 文件名模式: `EB-I-485-PendingInventory-YYYY-Mon.csv`

@@ -112,6 +112,7 @@ function Dashboard({ nodes }) {
             <Widget.Header><div><Widget.Title>{text('shell.chart')}</Widget.Title><EngineText component={Widget.Description} id="chart-description" initialKey="shell.chartDescription" /></div><span className="model-label">{text('shell.simulations', { count: 500 })}</span></Widget.Header>
             <Widget.Content><LegacySlot node={nodes.chart} /></Widget.Content>
           </Widget>
+          <LegacySlot node={nodes.queue} className="queue-slot" />
           <ConsultLink />
           </div>
           <Widget className="details-widget">
@@ -132,6 +133,7 @@ const nodes = {
   profile: source.querySelector('#profile-edit'),
   result: source.querySelector('.result'),
   chart: source.querySelector('.chart-panel'),
+  queue: source.querySelector('#queue-panel'),
   tabs: source.querySelector('.gc-tabs'),
   footer: source.querySelector('.footer'),
   table: source.querySelector('table')

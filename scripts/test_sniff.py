@@ -438,6 +438,88 @@ finally:
         os.environ["GITHUB_ENV"] = _env
     _shutil.rmtree(_tmp, ignore_errors=True)
 
+print("\n## I-485 库存文件名（版本后缀）")
+import check_data_updates as CD
+check("无后缀 → 版本 (0,0)", CD.inventory_version("eb_inventory_april_2026.xlsx"), ("april", 2026, (0, 0)))
+check("_v1 → (1,0)", CD.inventory_version("eb_inventory_october_2026_v1.xlsx"), ("october", 2026, (1, 0)))
+check("_v1.0 与 _v1 同版本", CD.inventory_version("eb_inventory_may_2026_v1.0.xlsx")[2], (1, 0))
+check("_v2.1 → (2,1)", CD.inventory_version("eb_inventory_may_2026_v2.1.xlsx")[2], (2, 1))
+check("非库存文件 → None", CD.inventory_version("I140_FY2026_Q3.xlsx"), None)
+check("候选 URL 新版本在前、无后缀最后",
+      [u.rsplit("/", 1)[-1] for u in CD.inventory_candidate_urls("june", 2026)][:2] + [CD.inventory_candidate_urls("june", 2026)[-1].rsplit("/", 1)[-1]],
+      ["eb_inventory_june_2026_v3.0.xlsx", "eb_inventory_june_2026_v3.xlsx", "eb_inventory_june_2026.xlsx"])
+_PAGE = ('<a href="/sites/default/files/document/data/eb_inventory_october_2026_v1.xlsx">Oct</a>'
+         '<a href="/sites/default/files/document/data/eb_inventory_september_2026_v1.xlsx">Sep</a>'
+         "<a href='https://www.uscis.gov/sites/default/files/document/data/eb_inventory_september_2026_v2.xlsx'>Sep v2</a>"
+         '<a href="/sites/default/files/document/data/i140_rec_by_class.xlsx">I-140</a>')
+_links = CD.parse_inventory_links(_PAGE)
+check("数据页：相对链接补全为绝对 URL", _links[(2026, 10)][1],
+      "https://www.uscis.gov/sites/default/files/document/data/eb_inventory_october_2026_v1.xlsx")
+check("数据页：同月多版本取最新", _links[(2026, 9)][0], (2, 0))
+check("数据页：只收库存文件", sorted(_links), [(2026, 9), (2026, 10)])
+
+# 端到端：页上列出的月份直接用页上链接（不探测）；页上没有的按后缀从新到旧探测，
+# 第一个 200 即最新；已下载月份出现更高版本时覆盖并记录来源。
+import datetime as _dt
+import pathlib as _pl
+import tempfile as _tf
+_tmpd = _pl.Path(_tf.mkdtemp())
+_saved_cd = {k: getattr(CD, k) for k in ("USCIS_DIR", "INVENTORY_SOURCES", "REPO_ROOT", "probe_diag", "download", "datetime")}
+_probed, _got = [], {}
+_exists = {"eb_inventory_july_2026_v1.0.xlsx", "eb_inventory_july_2026.xlsx"}
+
+
+class _FakeDT(_dt.datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 10, 20)
+
+
+def _fake_probe(source, url):
+    _probed.append(url.rsplit("/", 1)[-1])
+    return 200 if url.rsplit("/", 1)[-1] in _exists else 404
+
+
+def _fake_download(url, dest):
+    _got[dest.name] = url.rsplit("/", 1)[-1]
+    dest.write_bytes(b"x")
+    return True
+
+
+try:
+    (_tmpd / "uscis").mkdir()
+    CD.USCIS_DIR, CD.REPO_ROOT = _tmpd / "uscis", _tmpd
+    CD.INVENTORY_SOURCES = CD.USCIS_DIR / "inventory_sources.json"
+    CD.probe_diag, CD.download, CD.datetime = _fake_probe, _fake_download, _FakeDT
+    for _m in CD.MONTHS:   # 2025 全年和 2026 年 1–6 月、8 月已在本地
+        (CD.USCIS_DIR / f"I485_Pending_Inventory_{_m}_2025.xlsx").write_bytes(b"x")
+    for _m in CD.MONTHS[:6] + ["august"]:
+        (CD.USCIS_DIR / f"I485_Pending_Inventory_{_m}_2026.xlsx").write_bytes(b"x")
+    CD.INVENTORY_SOURCES.write_text('{"I485_Pending_Inventory_september_2026.xlsx": "eb_inventory_september_2026_v1.xlsx"}')
+    (CD.USCIS_DIR / "I485_Pending_Inventory_september_2026.xlsx").write_bytes(b"x")
+    with contextlib.redirect_stdout(io.StringIO()) as _out:
+        _new = CD.check_i485_inventory(False, listing_html=_PAGE)
+    check("页上列出的 10 月用页上链接", _got.get("I485_Pending_Inventory_october_2026.xlsx"), "eb_inventory_october_2026_v1.xlsx")
+    check("9 月页上出现 v2 → 覆盖下载", _got.get("I485_Pending_Inventory_september_2026.xlsx"), "eb_inventory_september_2026_v2.xlsx")
+    check("页上没有的 7 月：逐个探测，取最新的 _v1.0 而非无后缀", _got.get("I485_Pending_Inventory_july_2026.xlsx"), "eb_inventory_july_2026_v1.0.xlsx")
+    check("  ↑ 探测在第一个 200 处停止", _probed[-1], "eb_inventory_july_2026_v1.0.xlsx")
+    check("  ↑ 页上有的月份不探测", [p for p in _probed if "october" in p or "september" in p], [])
+    check("  ↑ 走探测时打印告警", "不在 USCIS 数据页上" in _out.getvalue(), True)
+    check("本地已有且无新版本的月份不下载", "I485_Pending_Inventory_august_2026.xlsx" in _got, False)
+    check("来源清单记录真实文件名", _json2.loads(CD.INVENTORY_SOURCES.read_text())["I485_Pending_Inventory_july_2026.xlsx"],
+          "eb_inventory_july_2026_v1.0.xlsx")
+    check("返回新增/更新的本地路径", sorted(_pl.Path(p).name for p in _new),
+          ["I485_Pending_Inventory_july_2026.xlsx", "I485_Pending_Inventory_october_2026.xlsx",
+           "I485_Pending_Inventory_september_2026.xlsx"])
+    with contextlib.redirect_stdout(io.StringIO()) as _out:
+        CD.check_i485_inventory(True, listing_html="")
+    check("数据页解析不到链接 → 无条件告警", "未解析到任何" in _out.getvalue(), True)
+finally:
+    for k, v in _saved_cd.items():
+        setattr(CD, k, v)
+    import shutil as _sh2
+    _sh2.rmtree(_tmpd, ignore_errors=True)
+
 print()
 if FAILED:
     print(f"❌ {len(FAILED)} 项失败: {FAILED}")
