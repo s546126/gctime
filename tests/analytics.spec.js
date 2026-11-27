@@ -242,6 +242,21 @@ test('consult pages report views and lead results without personal data', async 
   expect(external.filter(url => posthogPattern.test(url))).toEqual([])
 })
 
+test('lead source keeps the first utm_source of the session', async ({ page, context }) => {
+  await emulateHost(page, context, prod)
+  await seed(page)
+  const sent = []
+  await page.route('**/api/lead', route => { sent.push(JSON.parse(route.request().postData())); route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }) })
+  await page.goto(prod + '/visa-bulletin/?utm_source=X&utm_medium=reply<b>')
+  await page.goto(prod + '/visa-bulletin/?utm_source=later')
+  await page.locator('.consult-cta a').click()
+  await expect(page).toHaveURL(prod + '/consult/')
+  await fillLead(page)
+  await page.click('#consult-form button[type=submit]')
+  await expect(page.locator('#consult-status')).toContainText('Your request was received')
+  expect(sent[0].source).toBe('/visa-bulletin/?utm_source=x&utm_medium=replyb')
+})
+
 for (const [path, placement] of [['/visa-bulletin/eb-2-china/', 'landing'], ['/zh/eb-2-china/', 'landing'], ['/visa-bulletin/', 'hub'], ['/zh/visa-bulletin/', 'hub']]) {
   test(`static ${placement} page ${path} reports the consult CTA click`, async ({ page, context }) => {
     await emulateHost(page, context, prod)

@@ -38,7 +38,7 @@ where=""
 
 case "$mode" in
   list) sql="SELECT $COLUMNS FROM leads $where ORDER BY id DESC LIMIT $limit" ;;
-  count) sql="SELECT category, country, COUNT(*) AS n FROM leads $where GROUP BY category, country ORDER BY n DESC" ;;
+  count) sql="SELECT category, country, CASE WHEN instr(source, 'utm_source=') > 0 THEN substr(source, instr(source, 'utm_source=') + 11) ELSE 'direct' END AS channel, COUNT(*) AS n FROM leads $where GROUP BY category, country, channel ORDER BY n DESC" ;;
   delete) sql="DELETE FROM leads WHERE id = $delete_id" ;;
 esac
 

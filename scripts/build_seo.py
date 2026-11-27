@@ -469,7 +469,7 @@ CONSULT = {
 CONSULT_SCRIPT = r"""(function(){
 var M=__MESSAGES__,form=document.getElementById('consult-form'),out=document.getElementById('consult-status'),btn=form.querySelector('button[type=submit]');
 function say(text,link){out.textContent=text;if(link){out.appendChild(document.createTextNode(' '));var a=document.createElement('a');a.href=link;a.textContent=link;out.appendChild(a);}}
-function source(){try{var r=document.referrer&&new URL(document.referrer);if(r&&r.origin===location.origin)return r.pathname;}catch(e){}return location.pathname;}
+function source(){var p=location.pathname;try{var r=document.referrer&&new URL(document.referrer);if(r&&r.origin===location.origin)p=r.pathname;}catch(e){}try{var u=sessionStorage.getItem('gc_utm');if(u&&/^utm_source=[a-z0-9_.-]{1,32}(&utm_medium=[a-z0-9_.-]{1,32})?$/.test(u))p+='?'+u;}catch(e){}return p;}
 function locale(){var q=new URLSearchParams(location.search).get('lang');return q&&/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(q)?q:document.documentElement.lang;}
 form.addEventListener('submit',function(e){
 e.preventDefault();if(btn.disabled)return;
