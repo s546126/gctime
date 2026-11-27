@@ -30,6 +30,15 @@ EB-1 ~ EB-5 排期预测工具（EB-1 杰出人才 / EB-2 / EB-3 / EB-4 / EB-5 �
 
 `scripts/build_seo.py` 为 11 种界面语言各生成一个总表页和 25 个类别 × 国家页（EB-1…EB-5 × china、india、row、mexico、philippines），文案在 `scripts/seo_locales.py`，术语沿用 `src/locales/*.js`。URL 规则：英文 `/visa-bulletin/` 与 `/visa-bulletin/eb-2-china/`；其他语言 `/<前缀>/visa-bulletin/` 与 `/<前缀>/eb-2-china/`，前缀为 `zh`、`hi`、`es`、`pt-br`、`ja`、`ko`、`ar`、`de`、`fr`、`it`。每页带全部语言版本的 hreflang（x-default 为英文）和语言切换菜单，`sitemap.xml` 同样列出 `xhtml:link` 互链；`feed.xml` 只有英文。免费评估页只有 `/consult/` 和 `/zh/consult/`，其他语言链接到英文表单。阿拉伯语页为 `dir="rtl"`。
 
+## I-485 库存排位
+
+预测结果下方有一段「I-485 库存里排在你前面的人」（EB-1/2/3 × 中国大陆、印度、墨西哥、菲律宾、其他国家）：按 USCIS 每月发布的在案 I-485 库存（Pending Applications for Employment-Based Preference Categories），统计优先日早于你所在月份的申请数、占该类别在案总数的比例，以及最近 3 期库存里这一数字和你同月申请数的变化（“比某期少了/多了多少”）。
+
+- 口径：只看你出生国（chargeability）那张表，USCIS 说明里就是这样读；Available 与 Awaiting Availability 相加；每份 I-485 是一个人（含配偶子女）。库存只含已向 USCIS 递交的 I-485，不含走领馆的人和 I-140 已批但还不能递件的人，所以是下界。
+- “D”（1–9 件，被隐藏）按 5 件估算，同时给出按 1 与 9 计算的范围；库存只到月份，与你同月的申请不计入“早于你”。优先日落在 USCIS 合并统计的“Prior Years”里时只给上限。
+- 数据：`scripts/build_i485_queue.py --inject` 从最近 3 份 `data/raw/uscis/I485_Pending_Inventory_*.xlsx` 生成 `data/i485_queue.json`，嵌入 `index.html` 的 `I485Q_BEGIN/I485Q_END`（离线版同样可用）。每日数据工作流下载到新快照后自动重建；`scripts/check_project.py` 校验嵌入块与 JSON 一致、且最新一期就是本地最新快照。
+- 排期静态页（EB-1/2/3）另有一张按优先日年份的在案 I-485 表。
+
 ## 自愿赞助与隐私
 
 在线页面底部有一条固定的自愿赞助横幅，里面直接展示 Adsterra 横幅广告，不再打开 Direct Link，也不会自动跳转。视口宽度大于等于 768 像素时只用 728×90（`https://bauval.org/22/6d1946abad3d3fdcc79373556a137876`），更窄时只用 320×50（`https://bauval.org/22/d450c9cf5ef416c8ffc1907634e0d6e6`）；每次页面只注入一个单元。横幅在进入页面约 1 秒后出现，广告位按创意高度预留，工作区高度会减去整条横幅（含底部安全区）。可以关闭；关闭后约 3 分钟内不再显示，之后每次打开页面都会再次出现。广告脚本若被拦截或约 4 秒内没有出现 iframe，横幅会收起，不留空条。它不解锁任何功能。仅 `bracketboss2026.com`、`www.bracketboss2026.com` 和 `gc.bracketboss2026.com` 的 HTTPS 在线页面启用，预览、GitHub Pages、本地和单文件离线版不展示。
